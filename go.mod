@@ -7,3 +7,5 @@ require (
 	github.com/golang/protobuf v1.5.2
 	google.golang.org/protobuf v1.26.0
 )
+
+replace github.com/GoogleCloudPlatform/protoc-gen-bq-schema => github.com/Unity-Technologies/protoc-gen-bq-schema master
