@@ -89,7 +89,7 @@ func DerefString(s *string) string {
 }
 
 func registerType(pkgName *string, msg *descriptor.DescriptorProto, comments Comments, path string) {
-	glog.Infof("registerType: pkgName=%s msg=%s path=", DerefString(pkgName), msg.GetName(), path)
+	glog.Errorf("registerType: pkgName=%s msg=%s path=", DerefString(pkgName), msg.GetName(), path)
 	pkg := globalPkg
 	if pkgName != nil {
 		for _, node := range strings.Split(*pkgName, ".") {
@@ -120,7 +120,7 @@ func registerType(pkgName *string, msg *descriptor.DescriptorProto, comments Com
 }
 
 func (pkg *ProtoPackage) lookupType(name string) (*descriptor.DescriptorProto, bool, Comments, string) {
-	glog.Infof("lookupType: name=%s", name)
+	glog.Errorf("lookupType: name=%s", name)
 	if strings.HasPrefix(name, ".") {
 		return globalPkg.relativelyLookupType(name[1:])
 	}
@@ -153,7 +153,7 @@ componentLoop:
 }
 
 func (pkg *ProtoPackage) relativelyLookupType(name string) (*descriptor.DescriptorProto, bool, Comments, string) {
-	glog.Infof("relativelyLookupType: name=%s", name)
+	glog.Errorf("relativelyLookupType: name=%s", name)
 	components := strings.SplitN(name, ".", 2)
 	switch len(components) {
 	case 0:
@@ -182,7 +182,7 @@ func (pkg *ProtoPackage) relativelyLookupType(name string) (*descriptor.Descript
 }
 
 func (pkg *ProtoPackage) relativelyLookupPackage(name string) (*ProtoPackage, bool) {
-	glog.Infof("relativelyLookupPackage: name=%s", name)
+	glog.Errorf("relativelyLookupPackage: name=%s", name)
 	components := strings.Split(name, ".")
 	cur := pkg
 	for _, c := range components {
@@ -374,7 +374,7 @@ func convertExtraField(curPkg *ProtoPackage, extraFieldDefinition string, parent
 }
 
 func convertFieldsForType(curPkg *ProtoPackage, typeName string, parentMessages map[*descriptor.DescriptorProto]bool) ([]*Field, error) {
-	glog.Info("convertFieldsForType")
+	glog.Error("convertFieldsForType")
 	recordType, ok, comments, p := curPkg.lookupType(typeName)
 	if !ok {
 		return nil, fmt.Errorf("no such message type named %s", typeName)
@@ -436,7 +436,7 @@ func convertMessageType(
 }
 
 func convertFile(file *descriptor.FileDescriptorProto) ([]*plugin.CodeGeneratorResponse_File, error) {
-	glog.Info("convertFile")
+	glog.Error("convertFile")
 	name := path.Base(file.GetName())
 	pkg, ok := globalPkg.relativelyLookupPackage(file.GetPackage())
 	if !ok {
@@ -489,7 +489,7 @@ func convertFile(file *descriptor.FileDescriptorProto) ([]*plugin.CodeGeneratorR
 // the message has no gen_bq_schema.bigquery_opts option, this function returns
 // nil, nil.
 func getBigqueryMessageOptions(msg *descriptor.DescriptorProto) (*protos.BigQueryMessageOptions, error) {
-	glog.Info("getBigqueryMessageOptions")
+	glog.Error("getBigqueryMessageOptions")
 	options := msg.GetOptions()
 	if options == nil {
 		return nil, nil
@@ -508,7 +508,7 @@ func getBigqueryMessageOptions(msg *descriptor.DescriptorProto) (*protos.BigQuer
 // if a file contains more than one message types, then only the first message type will be processed.
 // in that case, the table names will follow the proto file names.
 func handleSingleMessageOpt(file *descriptor.FileDescriptorProto, requestParam string) {
-	glog.Info("handleSingleMessageOpt")
+	glog.Error("handleSingleMessageOpt")
 	if !strings.Contains(requestParam, "single-message") || len(file.GetMessageType()) == 0 {
 		return
 	}
@@ -538,7 +538,7 @@ func parseRequestOptions(requestParam string) map[string]string {
 }
 
 func convert(req *plugin.CodeGeneratorRequest) (*plugin.CodeGeneratorResponse, error) {
-	glog.Info("convert")
+	glog.Error("convert")
 	generateTargets := make(map[string]bool)
 	for _, file := range req.GetFileToGenerate() {
 		generateTargets[file] = true
@@ -552,7 +552,6 @@ func convert(req *plugin.CodeGeneratorRequest) (*plugin.CodeGeneratorResponse, e
 				for _, field := range descriptorProto.GetField() {
 					tmp := fmt.Sprintf(".%s%s", file.GetPackage(), field.GetTypeName())
 					field.TypeName = &tmp
-					glog.Error(field.GetName(), " ", field.GetTypeName())
 				}
 			}
 		}
@@ -580,7 +579,7 @@ func convert(req *plugin.CodeGeneratorRequest) (*plugin.CodeGeneratorResponse, e
 }
 
 func convertFrom(rd io.Reader) (*plugin.CodeGeneratorResponse, error) {
-	glog.Info("convertFrom")
+	glog.Error("convertFrom")
 	glog.V(1).Info("Reading code generation request")
 	input, err := ioutil.ReadAll(rd)
 	if err != nil {
