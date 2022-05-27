@@ -549,9 +549,22 @@ func convert(req *plugin.CodeGeneratorRequest) (*plugin.CodeGeneratorResponse, e
 			p := params[file.GetName()]
 			file.Package = &p
 			for _, descriptorProto := range file.GetMessageType() {
+
 				for _, field := range descriptorProto.GetField() {
 					tmp := fmt.Sprintf(".%s%s", file.GetPackage(), field.GetTypeName())
 					field.TypeName = &tmp
+					glog.Errorf("Name: %25s\tType: %15s", field.GetName(), field.GetTypeName())
+				}
+				glog.Error()
+
+				for _, d := range descriptorProto.GetNestedType() {
+					glog.Errorf("Name: %-25s", d.GetName())
+					for _, nestedDesc := range d.GetField() {
+						tmp := fmt.Sprintf(".%s%s", file.GetPackage(), nestedDesc.GetTypeName())
+						nestedDesc.TypeName = &tmp
+						glog.Errorf("Name: %25s\tType: %15s", nestedDesc.GetName(), nestedDesc.GetTypeName())
+					}
+					glog.Error()
 				}
 			}
 		}
