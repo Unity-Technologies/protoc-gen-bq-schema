@@ -25,13 +25,9 @@
 package main
 
 import (
-	"encoding/json"
 	"flag"
 	"fmt"
-	"io"
-	"io/ioutil"
 	"os"
-	"path"
 	"strings"
 
 	"github.com/GoogleCloudPlatform/protoc-gen-bq-schema/protos"
@@ -89,7 +85,7 @@ func DerefString(s *string) string {
 }
 
 func registerType(pkgName *string, msg *descriptor.DescriptorProto, comments Comments, path string) {
-	glog.Infof("registerType: pkgName=%s msg=%s path=", DerefString(pkgName), msg.GetName(), path)
+	glog.Errorf("registerType: pkgName=%s msg=%s path=%s", DerefString(pkgName), msg.GetName(), path)
 	pkg := globalPkg
 	if pkgName != nil {
 		for _, node := range strings.Split(*pkgName, ".") {
@@ -135,6 +131,7 @@ func (pkg *ProtoPackage) lookupType(name string) (*descriptor.DescriptorProto, b
 }
 
 func relativelyLookupNestedType(desc *descriptor.DescriptorProto, name string) (*descriptor.DescriptorProto, bool, string) {
+	glog.Errorf("relativelyLookupNestedType name=%s", name)
 	components := strings.Split(name, ".")
 	p := ""
 componentLoop:
@@ -152,9 +149,19 @@ componentLoop:
 	return desc, true, strings.Trim(p, ".")
 }
 
+func printPkg(pkg *ProtoPackage) {
+	names := make([]string, 0)
+	for k, v := range pkg.children {
+		for _, descriptorProto := range v.types {
+			names = append(names, descriptorProto.GetName())
+		}
+		glog.Errorf("%s: %s", k, names)
+	}
+}
+
 func (pkg *ProtoPackage) relativelyLookupType(name string) (*descriptor.DescriptorProto, bool, Comments, string) {
-	glog.Infof("relativelyLookupType: name=%s", name)
 	components := strings.SplitN(name, ".", 2)
+	glog.Errorf("relativelyLookupType: pkg.name=%s name=%s components=%v", pkg.name, name, components)
 	switch len(components) {
 	case 0:
 		glog.V(1).Info("empty message name")
@@ -163,8 +170,8 @@ func (pkg *ProtoPackage) relativelyLookupType(name string) (*descriptor.Descript
 		found, ok := pkg.types[components[0]]
 		return found, ok, pkg.comments[components[0]], pkg.path[components[0]]
 	case 2:
-		glog.Infof("looking for %s in %s at %s (%v)", components[1], components[0], pkg.name, pkg)
-
+		// glog.Errorf("%s:\n\tcomponents=%s pkg.name=%s", name, components, pkg.name)
+		// printPkg(pkg)
 		if child, ok := pkg.children[components[0]]; ok {
 			found, ok, comments, p := child.relativelyLookupType(components[1])
 			return found, ok, comments, p
@@ -435,55 +442,6 @@ func convertMessageType(
 	return
 }
 
-func convertFile(file *descriptor.FileDescriptorProto) ([]*plugin.CodeGeneratorResponse_File, error) {
-	glog.Info("convertFile")
-	name := path.Base(file.GetName())
-	pkg, ok := globalPkg.relativelyLookupPackage(file.GetPackage())
-	if !ok {
-		return nil, fmt.Errorf("no such package found: %s", file.GetPackage())
-	}
-
-	comments := ParseComments(file)
-	response := make([]*plugin.CodeGeneratorResponse_File, 0)
-	for msgIndex, msg := range file.GetMessageType() {
-		p := fmt.Sprintf("%d.%d", messagePath, msgIndex)
-
-		opts, err := getBigqueryMessageOptions(msg)
-		if err != nil {
-			return nil, err
-		}
-		if opts == nil {
-			continue
-		}
-
-		tableName := opts.GetTableName()
-		if len(tableName) == 0 {
-			continue
-		}
-
-		glog.V(2).Info("Generating schema for a message type ", msg.GetName())
-		schema, err := convertMessageType(pkg, msg, opts, make(map[*descriptor.DescriptorProto]bool), comments, p)
-		if err != nil {
-			glog.Errorf("Failed to convert %s: %v", name, err)
-			return nil, err
-		}
-
-		jsonSchema, err := json.MarshalIndent(schema, "", " ")
-		if err != nil {
-			glog.Error("Failed to encode schema", err)
-			return nil, err
-		}
-
-		resFile := &plugin.CodeGeneratorResponse_File{
-			Name:    proto.String(fmt.Sprintf("%s/%s.schema", strings.Replace(file.GetPackage(), ".", "/", -1), tableName)),
-			Content: proto.String(string(jsonSchema)),
-		}
-		response = append(response, resFile)
-	}
-
-	return response, nil
-}
-
 // getBigqueryMessageOptions returns the bigquery options for the given message.
 // If an error is encountered, it is returned instead. If no error occurs, but
 // the message has no gen_bq_schema.bigquery_opts option, this function returns
@@ -537,76 +495,15 @@ func parseRequestOptions(requestParam string) map[string]string {
 	return requestParams
 }
 
-func convert(req *plugin.CodeGeneratorRequest) (*plugin.CodeGeneratorResponse, error) {
-	glog.Info("convert")
-	generateTargets := make(map[string]bool)
-	for _, file := range req.GetFileToGenerate() {
-		generateTargets[file] = true
-	}
-	params := parseRequestOptions(req.GetParameter())
-	for _, file := range req.GetProtoFile() {
-		if _, ok := params[file.GetName()]; file.GetPackage() == "" && ok {
-			p := params[file.GetName()]
-			file.Package = &p
-			for _, descriptorProto := range file.GetMessageType() {
-				for _, field := range descriptorProto.GetField() {
-					tmp := fmt.Sprintf(".%s%s", file.GetPackage(), field.GetTypeName())
-					field.TypeName = &tmp
-					glog.Infof("Name: %25s\tType: %15s", field.GetName(), field.GetTypeName())
-				}
-				glog.Info()
-
-				for _, d := range descriptorProto.GetNestedType() {
-					glog.Infof("Name: %-25s", d.GetName())
-					for _, nestedDesc := range d.GetField() {
-						tmp := fmt.Sprintf(".%s%s", file.GetPackage(), nestedDesc.GetTypeName())
-						nestedDesc.TypeName = &tmp
-						glog.Infof("Name: %25s\tType: %15s", nestedDesc.GetName(), nestedDesc.GetTypeName())
-					}
-					glog.Info()
-				}
+func printStuff(desc *descriptor.FileDescriptorProto) {
+	for _, d := range desc.GetMessageType() {
+		for _, descriptorProto := range d.GetNestedType() {
+			glog.Errorf("%s:", descriptorProto.GetName())
+			for _, fieldDescriptorProto := range descriptorProto.GetField() {
+				glog.Errorf("\t%s: %s", fieldDescriptorProto.GetName(), fieldDescriptorProto.GetTypeName())
 			}
 		}
 	}
-	res := &plugin.CodeGeneratorResponse{}
-	for _, file := range req.GetProtoFile() {
-		for msgIndex, msg := range file.GetMessageType() {
-			glog.V(1).Infof("Loading a message type %s from package %s", msg.GetName(), file.GetPackage())
-			registerType(file.Package, msg, ParseComments(file), fmt.Sprintf("%d.%d", messagePath, msgIndex))
-		}
-	}
-	for _, file := range req.GetProtoFile() {
-		if _, ok := generateTargets[file.GetName()]; ok {
-			glog.V(1).Info("Converting ", file.GetName())
-			handleSingleMessageOpt(file, req.GetParameter())
-			converted, err := convertFile(file)
-			if err != nil {
-				res.Error = proto.String(fmt.Sprintf("Failed to convert %s: %v", file.GetName(), err))
-				return res, err
-			}
-			res.File = append(res.File, converted...)
-		}
-	}
-	return res, nil
-}
-
-func convertFrom(rd io.Reader) (*plugin.CodeGeneratorResponse, error) {
-	glog.Info("convertFrom")
-	glog.V(1).Info("Reading code generation request")
-	input, err := ioutil.ReadAll(rd)
-	if err != nil {
-		glog.Error("Failed to read request:", err)
-		return nil, err
-	}
-	req := &plugin.CodeGeneratorRequest{}
-	err = proto.Unmarshal(input, req)
-	if err != nil {
-		glog.Error("Can't unmarshal input:", err)
-		return nil, err
-	}
-
-	glog.V(1).Info("Converting input")
-	return convert(req)
 }
 
 func main() {
