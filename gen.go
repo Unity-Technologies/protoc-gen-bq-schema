@@ -7,7 +7,6 @@ import (
 	"io"
 	"io/ioutil"
 	"os"
-	"path"
 	"strings"
 
 	"github.com/GoogleCloudPlatform/protoc-gen-bq-schema/protos"
@@ -17,117 +16,125 @@ import (
 	descriptor "google.golang.org/protobuf/types/descriptorpb"
 )
 
-// GetCodeGenRequest accepts an `io.Reader` and reads the entire stream; unmarshalling the data into a `CodeGeneratorRequest`. This request is used to generate the BQ schema
-func GetCodeGenRequest(rd io.Reader) (*plugin.CodeGeneratorRequest, error) {
-	glog.Info("convertFrom")
-	input, err := ioutil.ReadAll(rd)
-	if err != nil {
-		glog.Error("Failed to read request:", err)
-		return nil, err
-	}
+var locals Locals
+
+// GetCodeGenRequestResponse accepts an `io.Reader` and reads the entire stream; unmarshalling the data into a
+// `CodeGeneratorRequest`. This request is used to generate the BQ schema
+func GetCodeGenRequestResponse(rd io.Reader) (*plugin.CodeGeneratorRequest, *plugin.CodeGeneratorResponse) {
+	var input []byte
+	var err error
+
 	req := &plugin.CodeGeneratorRequest{}
-	err = proto.Unmarshal(input, req)
-	if err != nil {
-		glog.Error("Can't unmarshal input:", err)
-		return nil, err
+	resp := &plugin.CodeGeneratorResponse{}
+	if input, err = ioutil.ReadAll(rd); err != nil {
+		resp.Error = proto.String(err.Error())
+		return req, resp
 	}
-	return req, err
+	if err = proto.Unmarshal(input, req); err != nil {
+		resp.Error = proto.String(err.Error())
+		return req, resp
+	}
+	return req, resp
 }
 
-func convert(req *plugin.CodeGeneratorRequest) (*plugin.CodeGeneratorResponse, error) {
+func DottedName(root string, parts ...string) string {
+	return strings.Join(append([]string{root}, parts...), ".")
+}
+
+func traverse(prefix string, stack []*descriptor.DescriptorProto) BQSchema {
+	results := make(BQSchema)
+	for len(stack) > 0 {
+		descriptorProto := stack[0]
+		stack = stack[1:]
+		key := strings.Join([]string{prefix, descriptorProto.GetName()}, ".")
+		prefix = key
+		stack = append(stack, descriptorProto.GetNestedType()...)
+		field := &BQField{
+			Name:        descriptorProto.GetName(),
+			Type:        DottedName(prefix, descriptorProto.GetName()),
+			Mode:        "NULLABLE",
+			Description: "",
+			Fields:      nil,
+			PolicyTags:  nil,
+		}
+	}
+	glog.Error(p)
+}
+
+func getFileForResponse(pkgName string, msg *descriptor.DescriptorProto) (*plugin.CodeGeneratorResponse_File, error) {
+	// p := fmt.Sprintf("%d.%d", messagePath, msgIndex)
+	var opts *protos.BigQueryMessageOptions
+	var jsonSchema []byte
+	var err error
+
+	if opts, err = getBigqueryMessageOptions(msg); err != nil {
+		return nil, err
+	}
+
+	tableName := opts.GetTableName()
+	if jsonSchema, err = json.MarshalIndent([]byte{}, "", " "); err != nil {
+		return nil, err
+	}
+	stack := []*descriptor.DescriptorProto{msg}
+	traverse(pkgName, stack)
+
+	resFile := &plugin.CodeGeneratorResponse_File{
+		Name:    proto.String(fmt.Sprintf("%s/%s.schema", strings.Replace(pkgName, ".", "/", -1), tableName)),
+		Content: proto.String(string(jsonSchema)),
+	}
+	return resFile, nil
+}
+
+func getFilesForResponse(file *descriptor.FileDescriptorProto) ([]*plugin.CodeGeneratorResponse_File, error) {
+	var err error
+
+	// name := path.Base(file.GetName())
+	// comments := ParseComments(file)
+	// schema := make(BQSchema, 0)
+	responseFile := make([]*plugin.CodeGeneratorResponse_File, 0)
+
+	for _, msg := range file.GetMessageType() {
+		responseFile = append(responseFile, getFileForResponse(msg))
+	}
+	return responseFile, nil
+}
+
+func writeResp(res *plugin.CodeGeneratorResponse) {
+	var data []byte
+	var err error
+
+	if data, err = proto.Marshal(res); err != nil {
+		glog.Errorf("cannot marshal response: %v", err)
+	}
+	if _, err = os.Stdout.Write(data); err != nil {
+		glog.Errorf("failed to write response: %v", err)
+	}
+}
+
+func main() {
+	var req *plugin.CodeGeneratorRequest
+	var res *plugin.CodeGeneratorResponse
+	var converted []*plugin.CodeGeneratorResponse_File
+
+	var err error
+
+	flag.Parse()
+	if req, res = GetCodeGenRequestResponse(os.Stdin); res.Error != nil {
+		return
+	}
 	generateTargets := make(map[string]bool)
 	for _, file := range req.GetFileToGenerate() {
 		generateTargets[file] = true
 	}
-	res := &plugin.CodeGeneratorResponse{}
+
 	for _, file := range req.GetProtoFile() {
 		if _, ok := generateTargets[file.GetName()]; ok {
-			converted, err := convertFile(file)
-			if err != nil {
+			if converted, err = getFilesForResponse(file); err != nil {
 				res.Error = proto.String(fmt.Sprintf("Failed to convert %s: %v", file.GetName(), err))
-				return res, err
 			}
 			res.File = append(res.File, converted...)
 		}
 	}
-	return res, nil
-}
 
-func convertFile(file *descriptor.FileDescriptorProto) ([]*plugin.CodeGeneratorResponse_File, error) {
-	var opts *protos.BigQueryMessageOptions
-	var err error
-
-	glog.Info("convertFile")
-	name := path.Base(file.GetName())
-
-	comments := ParseComments(file)
-	response := make([]*plugin.CodeGeneratorResponse_File, 0)
-	for _, msg := range file.GetMessageType() {
-		// p := fmt.Sprintf("%d.%d", messagePath, msgIndex)
-
-		if opts, err = getBigqueryMessageOptions(msg); err != nil {
-			return nil, err
-		}
-		if opts == nil {
-			glog.Error("wtf")
-			continue
-		}
-
-		tableName := opts.GetTableName()
-		if len(tableName) == 0 {
-			continue
-		}
-
-		glog.Errorf("Generating schema for a message type %s", msg.GetName())
-		schema, err := convertMessageType(pkg, msg, opts, make(map[*descriptor.DescriptorProto]bool), comments, p)
-		if err != nil {
-			glog.Errorf("Failed to convert %s: %v", name, err)
-			return nil, err
-		}
-
-		jsonSchema, err := json.MarshalIndent([]byte{}, "", " ")
-		if err != nil {
-			glog.Error("Failed to encode schema", err)
-			return nil, err
-		}
-
-		resFile := &plugin.CodeGeneratorResponse_File{
-			Name:    proto.String(fmt.Sprintf("%s/%s.schema", strings.Replace(file.GetPackage(), ".", "/", -1), tableName)),
-			Content: proto.String(string(jsonSchema)),
-		}
-		response = append(response, resFile)
-	}
-
-	return response, nil
-}
-
-func main() {
-	var locals Locals
-	var req *plugin.CodeGeneratorRequest
-	var res *plugin.CodeGeneratorResponse
-	var data []byte
-	var err error
-
-	flag.Parse()
-	if req, err = GetCodeGenRequest(os.Stdin); err != nil {
-		if res == nil {
-			message := fmt.Sprintf("Failed to read input: %v", err)
-			res = &plugin.CodeGeneratorResponse{
-				Error: &message,
-			}
-		}
-	}
-	locals.Init(req)
-	if res, err = convert(req); err != nil {
-		glog.Errorf("Cannot convert request: %v", err)
-		return
-	}
-	if data, err = proto.Marshal(res); err != nil {
-		glog.Errorf("Cannot marshal response: %v", err)
-		return
-	}
-	if _, err = os.Stdout.Write(data); err != nil {
-		glog.Errorf("Failed to write response: %v", err)
-		return
-	}
+	writeResp(res)
 }
