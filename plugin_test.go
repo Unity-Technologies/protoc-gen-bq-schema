@@ -93,18 +93,18 @@ func TestSimple(t *testing.T) {
 	testConvert(t, `
 			file_to_generate: "foo.proto"
 			proto_file <
-				name: "foo.proto"
+				Name: "foo.proto"
 				package: "example_package.nested"
 				message_type <
-					name: "FooProto"
-					field < name: "i1" number: 1 type: TYPE_INT32 label: LABEL_OPTIONAL >
+					Name: "FooProto"
+					field < Name: "i1" number: 1 type: TYPE_INT32 label: LABEL_OPTIONAL >
 					options < [gen_bq_schema.bigquery_opts] <table_name: "foo_table"> >
 				>
 			>
 		`,
 		map[string]string{
 			"example_package/nested/foo_table.schema": `[
-				{ "name": "i1", "type": "INTEGER", "mode": "NULLABLE" }
+				{ "Name": "i1", "type": "INTEGER", "mode": "NULLABLE" }
 			]`,
 		})
 }
@@ -114,26 +114,26 @@ func TestIgnoreNonTargetMessage(t *testing.T) {
 	testConvert(t, `
 			file_to_generate: "foo.proto"
 			proto_file <
-				name: "foo.proto"
+				Name: "foo.proto"
 				package: "example_package.nested"
 				message_type <
-					name: "FooProto"
-					field < name: "i1" number: 1 type: TYPE_INT32 label: LABEL_OPTIONAL >
+					Name: "FooProto"
+					field < Name: "i1" number: 1 type: TYPE_INT32 label: LABEL_OPTIONAL >
 				>
 				message_type <
-					name: "BarProto"
-					field < name: "i1" number: 1 type: TYPE_INT32 label: LABEL_OPTIONAL >
+					Name: "BarProto"
+					field < Name: "i1" number: 1 type: TYPE_INT32 label: LABEL_OPTIONAL >
 					options < [gen_bq_schema.bigquery_opts] <table_name: "bar_table"> >
 				>
 				message_type <
-					name: "BazProto"
-					field < name: "i1" number: 1 type: TYPE_INT32 label: LABEL_OPTIONAL >
+					Name: "BazProto"
+					field < Name: "i1" number: 1 type: TYPE_INT32 label: LABEL_OPTIONAL >
 				>
 			>
 		`,
 		map[string]string{
 			"example_package/nested/bar_table.schema": `[
-				{ "name": "i1", "type": "INTEGER", "mode": "NULLABLE" }
+				{ "Name": "i1", "type": "INTEGER", "mode": "NULLABLE" }
 			]`,
 		})
 }
@@ -143,27 +143,27 @@ func TestIgnoreNonTargetFile(t *testing.T) {
 	testConvert(t, `
 			file_to_generate: "foo.proto"
 			proto_file <
-				name: "foo.proto"
+				Name: "foo.proto"
 				package: "example_package.nested"
 				message_type <
-					name: "FooProto"
-					field < name: "i1" number: 1 type: TYPE_INT32 label: LABEL_OPTIONAL >
+					Name: "FooProto"
+					field < Name: "i1" number: 1 type: TYPE_INT32 label: LABEL_OPTIONAL >
 					options < [gen_bq_schema.bigquery_opts] <table_name: "foo_table"> >
 				>
 			>
 			proto_file <
-				name: "bar.proto"
+				Name: "bar.proto"
 				package: "example_package.nested"
 				message_type <
-					name: "BarProto"
-					field < name: "i1" number: 1 type: TYPE_INT32 label: LABEL_OPTIONAL >
+					Name: "BarProto"
+					field < Name: "i1" number: 1 type: TYPE_INT32 label: LABEL_OPTIONAL >
 					options < [gen_bq_schema.bigquery_opts] <table_name: "bar_table"> >
 				>
 			>
 		`,
 		map[string]string{
 			"example_package/nested/foo_table.schema": `[
-				{ "name": "i1", "type": "INTEGER", "mode": "NULLABLE" }
+				{ "Name": "i1", "type": "INTEGER", "mode": "NULLABLE" }
 			]`,
 		})
 }
@@ -174,33 +174,33 @@ func TestStopsAtRecursiveMessage(t *testing.T) {
 	testConvert(t, `
 			file_to_generate: "foo.proto"
 			proto_file <
-				name: "foo.proto"
+				Name: "foo.proto"
 				package: "example_package.recursive"
 				message_type <
-					name: "FooProto"
-					field < name: "i1" number: 1 type: TYPE_INT32 label: LABEL_OPTIONAL >
+					Name: "FooProto"
+					field < Name: "i1" number: 1 type: TYPE_INT32 label: LABEL_OPTIONAL >
 					field <
-                        name: "bar" number: 2 type: TYPE_MESSAGE label: LABEL_OPTIONAL
+                        Name: "bar" number: 2 type: TYPE_MESSAGE label: LABEL_OPTIONAL
                         type_name: "BarProto" >
 					options < [gen_bq_schema.bigquery_opts] <table_name: "foo_table"> >
 				>
 				message_type <
-					name: "BarProto"
-					field < name: "i2" number: 1 type: TYPE_INT32 label: LABEL_OPTIONAL >
+					Name: "BarProto"
+					field < Name: "i2" number: 1 type: TYPE_INT32 label: LABEL_OPTIONAL >
 					field <
-                        name: "foo" number: 2 type: TYPE_MESSAGE label: LABEL_OPTIONAL
+                        Name: "foo" number: 2 type: TYPE_MESSAGE label: LABEL_OPTIONAL
                         type_name: "FooProto" >
 				>
 			>
 		`,
 		map[string]string{
 			"example_package/recursive/foo_table.schema": `[
-				{ "name": "i1", "type": "INTEGER", "mode": "NULLABLE" },
+				{ "Name": "i1", "type": "INTEGER", "mode": "NULLABLE" },
 				{
-					"name": "bar",
+					"Name": "bar",
                     "type": "RECORD",
                     "mode": "NULLABLE",
-					"fields": [{ "name": "i2", "type": "INTEGER", "mode": "NULLABLE" }]
+					"fields": [{ "Name": "i2", "type": "INTEGER", "mode": "NULLABLE" }]
 				}
 			]`,
 		})
@@ -211,136 +211,136 @@ func TestTypes(t *testing.T) {
 	testConvert(t, `
 			file_to_generate: "foo.proto"
 			proto_file <
-				name: "foo.proto"
+				Name: "foo.proto"
 				package: "example_package.nested"
 				message_type <
-					name: "FooProto"
-					field < name: "i32" number: 1 type: TYPE_INT32 label: LABEL_OPTIONAL >
-					field < name: "i64" number: 2 type: TYPE_INT64 label: LABEL_OPTIONAL >
-					field < name: "ui32" number: 3 type: TYPE_UINT32 label: LABEL_OPTIONAL >
-					field < name: "ui64" number: 4 type: TYPE_UINT64 label: LABEL_OPTIONAL >
-					field < name: "si32" number: 5 type: TYPE_SINT32 label: LABEL_OPTIONAL >
-					field < name: "si64" number: 6 type: TYPE_SINT64 label: LABEL_OPTIONAL >
-					field < name: "ufi32" number: 7 type: TYPE_FIXED32 label: LABEL_OPTIONAL >
-					field < name: "ufi64" number: 8 type: TYPE_FIXED64 label: LABEL_OPTIONAL >
-					field < name: "sfi32" number: 9 type: TYPE_SFIXED32 label: LABEL_OPTIONAL >
-					field < name: "sfi64" number: 10 type: TYPE_SFIXED64 label: LABEL_OPTIONAL >
-					field < name: "d" number: 11 type: TYPE_DOUBLE label: LABEL_OPTIONAL >
-					field < name: "f" number: 12 type: TYPE_FLOAT label: LABEL_OPTIONAL >
-					field < name: "bool" number: 16 type: TYPE_BOOL label: LABEL_OPTIONAL >
-					field < name: "str" number: 13 type: TYPE_STRING label: LABEL_OPTIONAL >
-					field < name: "bytes" number: 14 type: TYPE_BYTES label: LABEL_OPTIONAL >
+					Name: "FooProto"
+					field < Name: "i32" number: 1 type: TYPE_INT32 label: LABEL_OPTIONAL >
+					field < Name: "i64" number: 2 type: TYPE_INT64 label: LABEL_OPTIONAL >
+					field < Name: "ui32" number: 3 type: TYPE_UINT32 label: LABEL_OPTIONAL >
+					field < Name: "ui64" number: 4 type: TYPE_UINT64 label: LABEL_OPTIONAL >
+					field < Name: "si32" number: 5 type: TYPE_SINT32 label: LABEL_OPTIONAL >
+					field < Name: "si64" number: 6 type: TYPE_SINT64 label: LABEL_OPTIONAL >
+					field < Name: "ufi32" number: 7 type: TYPE_FIXED32 label: LABEL_OPTIONAL >
+					field < Name: "ufi64" number: 8 type: TYPE_FIXED64 label: LABEL_OPTIONAL >
+					field < Name: "sfi32" number: 9 type: TYPE_SFIXED32 label: LABEL_OPTIONAL >
+					field < Name: "sfi64" number: 10 type: TYPE_SFIXED64 label: LABEL_OPTIONAL >
+					field < Name: "d" number: 11 type: TYPE_DOUBLE label: LABEL_OPTIONAL >
+					field < Name: "f" number: 12 type: TYPE_FLOAT label: LABEL_OPTIONAL >
+					field < Name: "bool" number: 16 type: TYPE_BOOL label: LABEL_OPTIONAL >
+					field < Name: "str" number: 13 type: TYPE_STRING label: LABEL_OPTIONAL >
+					field < Name: "bytes" number: 14 type: TYPE_BYTES label: LABEL_OPTIONAL >
 					field <
-						name: "enum1" number: 15 type: TYPE_ENUM label: LABEL_OPTIONAL
+						Name: "enum1" number: 15 type: TYPE_ENUM label: LABEL_OPTIONAL
 						type_name: ".example_package.nested.FooProto.Enum1"
 					>
 					field <
-						name: "enum2" number: 16 type: TYPE_ENUM label: LABEL_OPTIONAL
+						Name: "enum2" number: 16 type: TYPE_ENUM label: LABEL_OPTIONAL
 						type_name: "FooProto.Enum1"
 					>
 					field <
-						name: "grp1" number: 17 type: TYPE_GROUP label: LABEL_OPTIONAL
+						Name: "grp1" number: 17 type: TYPE_GROUP label: LABEL_OPTIONAL
 						type_name: ".example_package.nested.FooProto.Group1"
 					>
 					field <
-						name: "grp2" number: 18 type: TYPE_GROUP label: LABEL_OPTIONAL
+						Name: "grp2" number: 18 type: TYPE_GROUP label: LABEL_OPTIONAL
 						type_name: "FooProto.Group1"
 					>
 					field <
-						name: "msg1" number: 19 type: TYPE_MESSAGE label: LABEL_OPTIONAL
+						Name: "msg1" number: 19 type: TYPE_MESSAGE label: LABEL_OPTIONAL
 						type_name: ".example_package.nested.FooProto.Nested1"
 					>
 					field <
-						name: "msg2" number: 20 type: TYPE_MESSAGE label: LABEL_OPTIONAL
+						Name: "msg2" number: 20 type: TYPE_MESSAGE label: LABEL_OPTIONAL
 						type_name: "FooProto.Nested1"
 					>
 					field <
-						name: "msg3" number: 21 type: TYPE_MESSAGE label: LABEL_OPTIONAL
+						Name: "msg3" number: 21 type: TYPE_MESSAGE label: LABEL_OPTIONAL
 						type_name: ".example_package.nested2.BarProto"
 					>
 					field <
-						name: "msg4" number: 22 type: TYPE_MESSAGE label: LABEL_OPTIONAL
+						Name: "msg4" number: 22 type: TYPE_MESSAGE label: LABEL_OPTIONAL
 						type_name: "nested2.BarProto"
 					>
 					field <
-						name: "msg2" number: 23 type: TYPE_MESSAGE label: LABEL_OPTIONAL
+						Name: "msg2" number: 23 type: TYPE_MESSAGE label: LABEL_OPTIONAL
 						type_name: "FooProto.EmptyNested1"
 					>
 					nested_type <
-						name: "Group1"
-						field < name: "i1" number: 1 type: TYPE_INT32 label: LABEL_OPTIONAL >
+						Name: "Group1"
+						field < Name: "i1" number: 1 type: TYPE_INT32 label: LABEL_OPTIONAL >
 					>
 					nested_type <
-						name: "Nested1"
-						field < name: "i1" number: 1 type: TYPE_INT32 label: LABEL_OPTIONAL >
+						Name: "Nested1"
+						field < Name: "i1" number: 1 type: TYPE_INT32 label: LABEL_OPTIONAL >
 					>
 					nested_type <
-						name: "EmptyNested1"
+						Name: "EmptyNested1"
 					>
-					enum_type < name: "Enum1" value < name: "E1" number: 1 > value < name: "E2" number: 2 > >
+					enum_type < Name: "Enum1" value < Name: "E1" number: 1 > value < Name: "E2" number: 2 > >
 					options < [gen_bq_schema.bigquery_opts] <table_name: "foo_table"> >
 				>
 			>
 			proto_file <
-				name: "bar.proto"
+				Name: "bar.proto"
 				package: "example_package.nested2"
 				message_type <
-					name: "BarProto"
-					field < name: "i1" number: 1 type: TYPE_INT32 label: LABEL_OPTIONAL >
-					field < name: "i2" number: 2 type: TYPE_INT32 label: LABEL_OPTIONAL >
-					field < name: "i3" number: 3 type: TYPE_INT32 label: LABEL_OPTIONAL >
+					Name: "BarProto"
+					field < Name: "i1" number: 1 type: TYPE_INT32 label: LABEL_OPTIONAL >
+					field < Name: "i2" number: 2 type: TYPE_INT32 label: LABEL_OPTIONAL >
+					field < Name: "i3" number: 3 type: TYPE_INT32 label: LABEL_OPTIONAL >
 				>
 			>
 		`,
 		map[string]string{
 			"example_package/nested/foo_table.schema": `[
-				{ "name": "i32", "type": "INTEGER", "mode": "NULLABLE" },
-				{ "name": "i64", "type": "INTEGER", "mode": "NULLABLE" },
-				{ "name": "ui32", "type": "INTEGER", "mode": "NULLABLE" },
-				{ "name": "ui64", "type": "INTEGER", "mode": "NULLABLE" },
-				{ "name": "si32", "type": "INTEGER", "mode": "NULLABLE" },
-				{ "name": "si64", "type": "INTEGER", "mode": "NULLABLE" },
-				{ "name": "ufi32", "type": "INTEGER", "mode": "NULLABLE" },
-				{ "name": "ufi64", "type": "INTEGER", "mode": "NULLABLE" },
-				{ "name": "sfi32", "type": "INTEGER", "mode": "NULLABLE" },
-				{ "name": "sfi64", "type": "INTEGER", "mode": "NULLABLE" },
-				{ "name": "d", "type": "FLOAT", "mode": "NULLABLE" },
-				{ "name": "f", "type": "FLOAT", "mode": "NULLABLE" },
-				{ "name": "bool", "type": "BOOLEAN", "mode": "NULLABLE" },
-				{ "name": "str", "type": "STRING", "mode": "NULLABLE" },
-				{ "name": "bytes", "type": "BYTES", "mode": "NULLABLE" },
-				{ "name": "enum1", "type": "STRING", "mode": "NULLABLE" },
-				{ "name": "enum2", "type": "STRING", "mode": "NULLABLE" },
+				{ "Name": "i32", "type": "INTEGER", "mode": "NULLABLE" },
+				{ "Name": "i64", "type": "INTEGER", "mode": "NULLABLE" },
+				{ "Name": "ui32", "type": "INTEGER", "mode": "NULLABLE" },
+				{ "Name": "ui64", "type": "INTEGER", "mode": "NULLABLE" },
+				{ "Name": "si32", "type": "INTEGER", "mode": "NULLABLE" },
+				{ "Name": "si64", "type": "INTEGER", "mode": "NULLABLE" },
+				{ "Name": "ufi32", "type": "INTEGER", "mode": "NULLABLE" },
+				{ "Name": "ufi64", "type": "INTEGER", "mode": "NULLABLE" },
+				{ "Name": "sfi32", "type": "INTEGER", "mode": "NULLABLE" },
+				{ "Name": "sfi64", "type": "INTEGER", "mode": "NULLABLE" },
+				{ "Name": "d", "type": "FLOAT", "mode": "NULLABLE" },
+				{ "Name": "f", "type": "FLOAT", "mode": "NULLABLE" },
+				{ "Name": "bool", "type": "BOOLEAN", "mode": "NULLABLE" },
+				{ "Name": "str", "type": "STRING", "mode": "NULLABLE" },
+				{ "Name": "bytes", "type": "BYTES", "mode": "NULLABLE" },
+				{ "Name": "enum1", "type": "STRING", "mode": "NULLABLE" },
+				{ "Name": "enum2", "type": "STRING", "mode": "NULLABLE" },
 				{
-					"name": "grp1", "type": "RECORD", "mode": "NULLABLE",
-					"fields": [{ "name": "i1", "type": "INTEGER", "mode": "NULLABLE" }]
+					"Name": "grp1", "type": "RECORD", "mode": "NULLABLE",
+					"fields": [{ "Name": "i1", "type": "INTEGER", "mode": "NULLABLE" }]
 				},
 				{
-					"name": "grp2", "type": "RECORD", "mode": "NULLABLE",
-					"fields": [{ "name": "i1", "type": "INTEGER", "mode": "NULLABLE" }]
+					"Name": "grp2", "type": "RECORD", "mode": "NULLABLE",
+					"fields": [{ "Name": "i1", "type": "INTEGER", "mode": "NULLABLE" }]
 				},
 				{
-					"name": "msg1", "type": "RECORD", "mode": "NULLABLE",
-					"fields": [{ "name": "i1", "type": "INTEGER", "mode": "NULLABLE" }]
+					"Name": "msg1", "type": "RECORD", "mode": "NULLABLE",
+					"fields": [{ "Name": "i1", "type": "INTEGER", "mode": "NULLABLE" }]
 				},
 				{
-					"name": "msg2", "type": "RECORD", "mode": "NULLABLE",
-					"fields": [{ "name": "i1", "type": "INTEGER", "mode": "NULLABLE" }]
+					"Name": "msg2", "type": "RECORD", "mode": "NULLABLE",
+					"fields": [{ "Name": "i1", "type": "INTEGER", "mode": "NULLABLE" }]
 				},
 				{
-					"name": "msg3", "type": "RECORD", "mode": "NULLABLE",
+					"Name": "msg3", "type": "RECORD", "mode": "NULLABLE",
 					"fields": [
-						{ "name": "i1", "type": "INTEGER", "mode": "NULLABLE" },
-						{ "name": "i2", "type": "INTEGER", "mode": "NULLABLE" },
-						{ "name": "i3", "type": "INTEGER", "mode": "NULLABLE" }
+						{ "Name": "i1", "type": "INTEGER", "mode": "NULLABLE" },
+						{ "Name": "i2", "type": "INTEGER", "mode": "NULLABLE" },
+						{ "Name": "i3", "type": "INTEGER", "mode": "NULLABLE" }
 					]
 				},
 				{
-					"name": "msg4", "type": "RECORD", "mode": "NULLABLE",
+					"Name": "msg4", "type": "RECORD", "mode": "NULLABLE",
 					"fields": [
-						{ "name": "i1", "type": "INTEGER", "mode": "NULLABLE" },
-						{ "name": "i2", "type": "INTEGER", "mode": "NULLABLE" },
-						{ "name": "i3", "type": "INTEGER", "mode": "NULLABLE" }
+						{ "Name": "i1", "type": "INTEGER", "mode": "NULLABLE" },
+						{ "Name": "i2", "type": "INTEGER", "mode": "NULLABLE" },
+						{ "Name": "i3", "type": "INTEGER", "mode": "NULLABLE" }
 					]
 				}
 			]`,
@@ -353,52 +353,52 @@ func TestWellKnownTypes(t *testing.T) {
 	testConvert(t, `
 			file_to_generate: "foo.proto"
 			proto_file <
-				name: "foo.proto"
+				Name: "foo.proto"
 				package: "example_package"
 				message_type <
-					name: "FooProto"
+					Name: "FooProto"
 					field <
-						name: "i32" number: 1 type: TYPE_MESSAGE label: LABEL_OPTIONAL
+						Name: "i32" number: 1 type: TYPE_MESSAGE label: LABEL_OPTIONAL
 						type_name: ".google.protobuf.Int32Value"
 					>
 					field <
-						name: "i64" number: 2 type: TYPE_MESSAGE label: LABEL_OPTIONAL
+						Name: "i64" number: 2 type: TYPE_MESSAGE label: LABEL_OPTIONAL
 						type_name: ".google.protobuf.Int64Value"
 					>
 					field <
-						name: "ui32" number: 3 type: TYPE_MESSAGE label: LABEL_OPTIONAL
+						Name: "ui32" number: 3 type: TYPE_MESSAGE label: LABEL_OPTIONAL
 						type_name: ".google.protobuf.UInt32Value"
 					>
 					field <
-						name: "ui64" number: 4 type: TYPE_MESSAGE label: LABEL_OPTIONAL
+						Name: "ui64" number: 4 type: TYPE_MESSAGE label: LABEL_OPTIONAL
 						type_name: ".google.protobuf.UInt64Value"
 					>
 					field <
-						name: "d" number: 5 type: TYPE_MESSAGE label: LABEL_OPTIONAL
+						Name: "d" number: 5 type: TYPE_MESSAGE label: LABEL_OPTIONAL
 						type_name: ".google.protobuf.DoubleValue"
 					>
 					field <
-						name: "f" number: 6 type: TYPE_MESSAGE label: LABEL_OPTIONAL
+						Name: "f" number: 6 type: TYPE_MESSAGE label: LABEL_OPTIONAL
 						type_name: ".google.protobuf.FloatValue"
 					>
 					field <
-						name: "bool" number: 7 type: TYPE_MESSAGE label: LABEL_OPTIONAL
+						Name: "bool" number: 7 type: TYPE_MESSAGE label: LABEL_OPTIONAL
 						type_name: ".google.protobuf.BoolValue"
 					>
 					field <
-						name: "str" number: 8 type: TYPE_MESSAGE label: LABEL_OPTIONAL
+						Name: "str" number: 8 type: TYPE_MESSAGE label: LABEL_OPTIONAL
 						type_name: ".google.protobuf.StringValue"
 					>
 					field <
-						name: "bytes" number: 9 type: TYPE_MESSAGE label: LABEL_OPTIONAL
+						Name: "bytes" number: 9 type: TYPE_MESSAGE label: LABEL_OPTIONAL
 						type_name: ".google.protobuf.BytesValue"
 					>
 					field <
-						name: "du" number: 10 type: TYPE_MESSAGE label: LABEL_OPTIONAL
+						Name: "du" number: 10 type: TYPE_MESSAGE label: LABEL_OPTIONAL
 						type_name: ".google.protobuf.Duration"
 					>
 					field <
-						name: "t" number: 11 type: TYPE_MESSAGE label: LABEL_OPTIONAL
+						Name: "t" number: 11 type: TYPE_MESSAGE label: LABEL_OPTIONAL
 						type_name: ".google.protobuf.Timestamp"
 					>
 					options < [gen_bq_schema.bigquery_opts] <table_name: "foo_table"> >
@@ -407,17 +407,17 @@ func TestWellKnownTypes(t *testing.T) {
 		`,
 		map[string]string{
 			"example_package/foo_table.schema": `[
-				{ "name": "i32", "type": "INTEGER", "mode": "NULLABLE" },
-				{ "name": "i64", "type": "INTEGER", "mode": "NULLABLE" },
-				{ "name": "ui32", "type": "INTEGER", "mode": "NULLABLE" },
-				{ "name": "ui64", "type": "INTEGER", "mode": "NULLABLE" },
-				{ "name": "d", "type": "FLOAT", "mode": "NULLABLE" },
-				{ "name": "f", "type": "FLOAT", "mode": "NULLABLE" },
-				{ "name": "bool", "type": "BOOLEAN", "mode": "NULLABLE" },
-				{ "name": "str", "type": "STRING", "mode": "NULLABLE" },
-				{ "name": "bytes", "type": "BYTES", "mode": "NULLABLE" },
-				{ "name": "du", "type": "STRING", "mode": "NULLABLE" },
-				{ "name": "t", "type": "TIMESTAMP", "mode": "NULLABLE" }
+				{ "Name": "i32", "type": "INTEGER", "mode": "NULLABLE" },
+				{ "Name": "i64", "type": "INTEGER", "mode": "NULLABLE" },
+				{ "Name": "ui32", "type": "INTEGER", "mode": "NULLABLE" },
+				{ "Name": "ui64", "type": "INTEGER", "mode": "NULLABLE" },
+				{ "Name": "d", "type": "FLOAT", "mode": "NULLABLE" },
+				{ "Name": "f", "type": "FLOAT", "mode": "NULLABLE" },
+				{ "Name": "bool", "type": "BOOLEAN", "mode": "NULLABLE" },
+				{ "Name": "str", "type": "STRING", "mode": "NULLABLE" },
+				{ "Name": "bytes", "type": "BYTES", "mode": "NULLABLE" },
+				{ "Name": "du", "type": "STRING", "mode": "NULLABLE" },
+				{ "Name": "t", "type": "TIMESTAMP", "mode": "NULLABLE" }
 			]`,
 		})
 }
@@ -427,22 +427,22 @@ func TestModes(t *testing.T) {
 	testConvert(t, `
 			file_to_generate: "foo.proto"
 			proto_file <
-				name: "foo.proto"
+				Name: "foo.proto"
 				package: "example_package.nested"
 				message_type <
-					name: "FooProto"
-					field < name: "i1" number: 1 type: TYPE_INT32 label: LABEL_OPTIONAL >
-					field < name: "i2" number: 2 type: TYPE_INT32 label: LABEL_REQUIRED >
-					field < name: "i3" number: 3 type: TYPE_INT32 label: LABEL_REPEATED >
+					Name: "FooProto"
+					field < Name: "i1" number: 1 type: TYPE_INT32 label: LABEL_OPTIONAL >
+					field < Name: "i2" number: 2 type: TYPE_INT32 label: LABEL_REQUIRED >
+					field < Name: "i3" number: 3 type: TYPE_INT32 label: LABEL_REPEATED >
 					options < [gen_bq_schema.bigquery_opts] <table_name: "foo_table"> >
 				>
 			>
 		`,
 		map[string]string{
 			"example_package/nested/foo_table.schema": `[
-				{ "name": "i1", "type": "INTEGER", "mode": "NULLABLE" },
-				{ "name": "i2", "type": "INTEGER", "mode": "REQUIRED" },
-				{ "name": "i3", "type": "INTEGER", "mode": "REPEATED" }
+				{ "Name": "i1", "type": "INTEGER", "mode": "NULLABLE" },
+				{ "Name": "i2", "type": "INTEGER", "mode": "REQUIRED" },
+				{ "Name": "i3", "type": "INTEGER", "mode": "REPEATED" }
 			]`,
 		})
 }
@@ -451,12 +451,12 @@ func TestExtraFields(t *testing.T) {
 	testConvert(t, `
 			file_to_generate: "foo.proto"
 			proto_file <
-				name: "foo.proto"
+				Name: "foo.proto"
 				package: "example_package"
 				message_type <
-					name: "FooProto"
+					Name: "FooProto"
 					field <
-						name: "i1"
+						Name: "i1"
 						number: 1
 						type: TYPE_INT32
 						label: LABEL_OPTIONAL
@@ -476,31 +476,31 @@ func TestExtraFields(t *testing.T) {
 				>
 			>
 			proto_file <
-				name: "bar.proto"
+				Name: "bar.proto"
 				package: "example_package.nested2"
 				message_type <
-					name: "BarProto"
-					field < name: "i1" number: 1 type: TYPE_INT32 label: LABEL_OPTIONAL >
-					field < name: "i2" number: 2 type: TYPE_INT32 label: LABEL_OPTIONAL >
-					field < name: "i3" number: 3 type: TYPE_INT32 label: LABEL_OPTIONAL >
+					Name: "BarProto"
+					field < Name: "i1" number: 1 type: TYPE_INT32 label: LABEL_OPTIONAL >
+					field < Name: "i2" number: 2 type: TYPE_INT32 label: LABEL_OPTIONAL >
+					field < Name: "i3" number: 3 type: TYPE_INT32 label: LABEL_OPTIONAL >
 				>
 			>
 		`,
 		map[string]string{
 			"example_package/foo_table.schema": `[
-				{ "name": "i1", "type": "INTEGER", "mode": "NULLABLE" },
-				{ "name": "i2", "type": "INTEGER", "mode": "NULLABLE" },
-				{ "name": "i3", "type": "STRING", "mode": "REPEATED" },
-				{ "name": "i4", "type": "TIMESTAMP", "mode": "REQUIRED" },
+				{ "Name": "i1", "type": "INTEGER", "mode": "NULLABLE" },
+				{ "Name": "i2", "type": "INTEGER", "mode": "NULLABLE" },
+				{ "Name": "i3", "type": "STRING", "mode": "REPEATED" },
+				{ "Name": "i4", "type": "TIMESTAMP", "mode": "REQUIRED" },
 				{
-					"name": "i5", "type": "RECORD", "mode": "NULLABLE",
+					"Name": "i5", "type": "RECORD", "mode": "NULLABLE",
 					"fields": [
-						{ "name": "i1", "type": "INTEGER", "mode": "NULLABLE" },
-						{ "name": "i2", "type": "INTEGER", "mode": "NULLABLE" },
-						{ "name": "i3", "type": "INTEGER", "mode": "NULLABLE" }
+						{ "Name": "i1", "type": "INTEGER", "mode": "NULLABLE" },
+						{ "Name": "i2", "type": "INTEGER", "mode": "NULLABLE" },
+						{ "Name": "i3", "type": "INTEGER", "mode": "NULLABLE" }
 					]
 				},
-				{ "name": "i6", "type": "FLOAT", "mode": "REQUIRED" }
+				{ "Name": "i6", "type": "FLOAT", "mode": "REQUIRED" }
 			]`,
 		})
 }

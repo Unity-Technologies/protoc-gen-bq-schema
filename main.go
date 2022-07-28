@@ -38,7 +38,7 @@ import (
 
 // Field describes the schema of a field in BigQuery.
 type Field struct {
-	Name        string      `json:"name"`
+	Name        string      `json:"Name"`
 	Type        string      `json:"type"`
 	Mode        string      `json:"mode"`
 	Description string      `json:"description,omitempty"`

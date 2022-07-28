@@ -41,24 +41,38 @@ func DottedName(root string, parts ...string) string {
 	return strings.Join(append([]string{root}, parts...), ".")
 }
 
-func traverse(prefix string, stack []*descriptor.DescriptorProto) BQSchema {
-	results := make(BQSchema)
-	for len(stack) > 0 {
-		descriptorProto := stack[0]
-		stack = stack[1:]
-		key := strings.Join([]string{prefix, descriptorProto.GetName()}, ".")
-		prefix = key
-		stack = append(stack, descriptorProto.GetNestedType()...)
-		field := &BQField{
-			Name:        descriptorProto.GetName(),
-			Type:        DottedName(prefix, descriptorProto.GetName()),
-			Mode:        "NULLABLE",
-			Description: "",
-			Fields:      nil,
-			PolicyTags:  nil,
+func _traverseFields() BQSchema {
+
+}
+
+func traverseFields(pkgName string, msg *descriptor.DescriptorProto) BQSchema {
+	results := make(BQSchema, 0)
+	pkg := locals.GetType(pkgName)
+
+	for _, f := range msg.GetField() {
+		field := NewBQField(
+			f.GetName(),
+			typeFromFieldType[f.GetType()],
+			modeFromFieldLabel[f.GetLabel()],
+			"",
+		)
+
+		if f.GetType() == descriptor.FieldDescriptorProto_TYPE_GROUP || f.GetType() == descriptor.FieldDescriptorProto_TYPE_MESSAGE {
+			n := strings.Split(f.GetTypeName(), ".")
+			nested := pkg.Index[n[2]]
+			for _, descriptorProto := range nested.GetField() {
+				x := NewBQField(
+					descriptorProto.GetName(),
+					typeFromFieldType[descriptorProto.GetType()],
+					modeFromFieldLabel[descriptorProto.GetLabel()],
+					"",
+				)
+				field.Fields = append(field.Fields, x)
+			}
 		}
+		results = append(results, field)
 	}
-	glog.Error(p)
+	return results
 }
 
 func getFileForResponse(pkgName string, msg *descriptor.DescriptorProto) (*plugin.CodeGeneratorResponse_File, error) {
@@ -72,12 +86,11 @@ func getFileForResponse(pkgName string, msg *descriptor.DescriptorProto) (*plugi
 	}
 
 	tableName := opts.GetTableName()
-	if jsonSchema, err = json.MarshalIndent([]byte{}, "", " "); err != nil {
+	schema := traverseFields(pkgName, msg)
+
+	if jsonSchema, err = json.MarshalIndent(schema, "", " "); err != nil {
 		return nil, err
 	}
-	stack := []*descriptor.DescriptorProto{msg}
-	traverse(pkgName, stack)
-
 	resFile := &plugin.CodeGeneratorResponse_File{
 		Name:    proto.String(fmt.Sprintf("%s/%s.schema", strings.Replace(pkgName, ".", "/", -1), tableName)),
 		Content: proto.String(string(jsonSchema)),
@@ -86,17 +99,19 @@ func getFileForResponse(pkgName string, msg *descriptor.DescriptorProto) (*plugi
 }
 
 func getFilesForResponse(file *descriptor.FileDescriptorProto) ([]*plugin.CodeGeneratorResponse_File, error) {
+	var f *plugin.CodeGeneratorResponse_File
 	var err error
 
-	// name := path.Base(file.GetName())
 	// comments := ParseComments(file)
-	// schema := make(BQSchema, 0)
-	responseFile := make([]*plugin.CodeGeneratorResponse_File, 0)
+	responseFiles := make([]*plugin.CodeGeneratorResponse_File, 0)
 
 	for _, msg := range file.GetMessageType() {
-		responseFile = append(responseFile, getFileForResponse(msg))
+		if f, err = getFileForResponse(file.GetPackage(), msg); err != nil {
+			return nil, err
+		}
+		responseFiles = append(responseFiles, f)
 	}
-	return responseFile, nil
+	return responseFiles, nil
 }
 
 func writeResp(res *plugin.CodeGeneratorResponse) {
@@ -122,12 +137,18 @@ func main() {
 	if req, res = GetCodeGenRequestResponse(os.Stdin); res.Error != nil {
 		return
 	}
+	locals = InitLocals(req)
 	generateTargets := make(map[string]bool)
 	for _, file := range req.GetFileToGenerate() {
 		generateTargets[file] = true
 	}
 
+	params := ParseRequestOptions(req.GetParameter())
 	for _, file := range req.GetProtoFile() {
+		handleSingleMessageOpt(file, req.GetParameter())
+		if _, ok := params[file.GetName()]; file.GetPackage() == "" && ok {
+			file.Package = proto.String(params[file.GetName()])
+		}
 		if _, ok := generateTargets[file.GetName()]; ok {
 			if converted, err = getFilesForResponse(file); err != nil {
 				res.Error = proto.String(fmt.Sprintf("Failed to convert %s: %v", file.GetName(), err))

@@ -3,7 +3,7 @@ package main
 type BQSchema []*BQField
 
 type BQField struct {
-	Name        string      `json:"name"`
+	Name        string      `json:"Name"`
 	Type        string      `json:"type"`
 	Mode        string      `json:"mode"`
 	Description string      `json:"description,omitempty"`
