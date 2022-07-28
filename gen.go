@@ -41,8 +41,21 @@ func DottedName(root string, parts ...string) string {
 	return strings.Join(append([]string{root}, parts...), ".")
 }
 
-func _traverseFields() BQSchema {
-
+func _traverseFields(pkg *ProtoPackage, f *descriptor.FieldDescriptorProto) BQSchema {
+	schema := make(BQSchema)
+	if f.GetType() == descriptor.FieldDescriptorProto_TYPE_GROUP || f.GetType() == descriptor.FieldDescriptorProto_TYPE_MESSAGE {
+		n := strings.Split(f.GetTypeName(), ".")
+		nested := pkg.Index[n[2]]
+		for _, descriptorProto := range nested.GetField() {
+			x := NewBQField(
+				descriptorProto.GetName(),
+				typeFromFieldType[descriptorProto.GetType()],
+				modeFromFieldLabel[descriptorProto.GetLabel()],
+				"",
+			)
+			field.Fields = append(field.Fields, x)
+		}
+	}
 }
 
 func traverseFields(pkgName string, msg *descriptor.DescriptorProto) BQSchema {
@@ -54,20 +67,15 @@ func traverseFields(pkgName string, msg *descriptor.DescriptorProto) BQSchema {
 			f.GetName(),
 			typeFromFieldType[f.GetType()],
 			modeFromFieldLabel[f.GetLabel()],
-			"",
+			"description",
 		)
 
 		if f.GetType() == descriptor.FieldDescriptorProto_TYPE_GROUP || f.GetType() == descriptor.FieldDescriptorProto_TYPE_MESSAGE {
 			n := strings.Split(f.GetTypeName(), ".")
 			nested := pkg.Index[n[2]]
 			for _, descriptorProto := range nested.GetField() {
-				x := NewBQField(
-					descriptorProto.GetName(),
-					typeFromFieldType[descriptorProto.GetType()],
-					modeFromFieldLabel[descriptorProto.GetLabel()],
-					"",
-				)
-				field.Fields = append(field.Fields, x)
+				x := _traverseFields(pkg, f)
+				field.Fields = append(field.Fields, x...)
 			}
 		}
 		results = append(results, field)
