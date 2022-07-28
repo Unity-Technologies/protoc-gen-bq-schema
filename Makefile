@@ -54,3 +54,7 @@ examples: $(BQ_PLUGIN)
 	protoc -I. -Ivendor/protobuf --plugin=$(BQ_PLUGIN) --bq-schema_out=examples $(EXAMPLES_PROTO)
 
 .PHONY: goprotobuf glog
+
+run:
+	go build -o ~/bin/protoc-gen-bq-schema *.go
+	protoc -I ~/commerce/commerce-apis/ -I ~/commerce/commerce-apis/third_party/ --bq-schema_out=.scratch --bq-schema_opt=single-message --bq-schema_opt=Mcommerce/notification.sendNotification.proto=notification commerce/notification.sendNotification.proto

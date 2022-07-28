@@ -206,7 +206,7 @@ func TestStopsAtRecursiveMessage(t *testing.T) {
 		})
 }
 
-// TestTypes tests the generator with various field types
+// TestTypes tests the generator with various field packages
 func TestTypes(t *testing.T) {
 	testConvert(t, `
 			file_to_generate: "foo.proto"
@@ -347,7 +347,7 @@ func TestTypes(t *testing.T) {
 		})
 }
 
-// TestWellKnownTypes tests the generator with various well-known message types
+// TestWellKnownTypes tests the generator with various well-known message packages
 // which have custom JSON serialization.
 func TestWellKnownTypes(t *testing.T) {
 	testConvert(t, `
