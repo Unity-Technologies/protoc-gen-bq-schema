@@ -8,6 +8,7 @@ import (
 	"io/ioutil"
 	"os"
 	"strings"
+	"time"
 
 	"github.com/GoogleCloudPlatform/protoc-gen-bq-schema/protos"
 	"github.com/golang/glog"
@@ -17,6 +18,15 @@ import (
 )
 
 var locals Locals
+
+func getNested(pkgName string, fieldProto *descriptor.FieldDescriptorProto) *descriptor.DescriptorProto {
+	n := strings.Split(fieldProto.GetTypeName(), ".")
+	return locals.GetTypeFromPackage(pkgName, n[len(n)-1])
+}
+
+func IsRecordType(fieldProto *descriptor.FieldDescriptorProto) bool {
+	return fieldProto.GetType() == descriptor.FieldDescriptorProto_TYPE_GROUP || fieldProto.GetType() == descriptor.FieldDescriptorProto_TYPE_MESSAGE
+}
 
 // GetCodeGenRequestResponse accepts an `io.Reader` and reads the entire stream; unmarshalling the data into a
 // `CodeGeneratorRequest`. This request is used to generate the BQ schema
@@ -37,50 +47,78 @@ func GetCodeGenRequestResponse(rd io.Reader) (*plugin.CodeGeneratorRequest, *plu
 	return req, resp
 }
 
-func DottedName(root string, parts ...string) string {
-	return strings.Join(append([]string{root}, parts...), ".")
+func nestedPrint(level int, msg string) {
+	glog.Error(fmt.Sprintf("%*s", level*2, msg))
 }
 
-func _traverseFields(pkg *ProtoPackage, f *descriptor.FieldDescriptorProto) BQSchema {
-	schema := make(BQSchema)
-	if f.GetType() == descriptor.FieldDescriptorProto_TYPE_GROUP || f.GetType() == descriptor.FieldDescriptorProto_TYPE_MESSAGE {
-		n := strings.Split(f.GetTypeName(), ".")
-		nested := pkg.Index[n[2]]
-		for _, descriptorProto := range nested.GetField() {
-			x := NewBQField(
-				descriptorProto.GetName(),
-				typeFromFieldType[descriptorProto.GetType()],
-				modeFromFieldLabel[descriptorProto.GetLabel()],
-				"",
-			)
-			field.Fields = append(field.Fields, x)
+func printFieldNames(bqField *BQField) {
+	tmp := []string{}
+	for _, bqField := range bqField.Fields {
+		tmp = append(tmp, bqField.Name)
+	}
+	glog.Error("FIELDS: ", strings.Join(tmp, ", "))
+}
+
+func max(v ...int) int {
+	var m int
+	if len(v) > 0 {
+		m = v[0]
+	}
+	for i, e := range v {
+		if i == 0 || e > m {
+			m = e
 		}
 	}
+	return m
+}
+
+var seen = map[string]bool{}
+
+func _traverseField(pkg *ProtoPackage, bqField *BQField, protoField *descriptor.FieldDescriptorProto, descriptor *descriptor.DescriptorProto, level int) *BQField {
+	if IsRecordType(protoField) {
+		level += 1
+		// nestedPrint(level, protoField.GetName())
+		descriptor = getNested(pkg.Name, protoField)
+		for _, inner := range descriptor.GetField() {
+			innnerBQField := NewBQField(
+				inner.GetJsonName(),
+				typeFromFieldType[inner.GetType()],
+				modeFromFieldLabel[inner.GetLabel()],
+				"",
+			)
+			bqField.Fields = append(bqField.Fields, innnerBQField)
+			time.Sleep(500 * time.Millisecond)
+			if _, ok := seen[innnerBQField.Name]; IsRecordType(inner) && !ok {
+				// glog.Error("\nOUTTER: ", bqField.JSON())
+				// glog.Error("\nINNER: ", innnerBQField.JSON())
+				// glog.Errorf("%s", strings.Repeat("=", max(len(bqField.Name)+len("OUTTER: "), len(innnerBQField.Name)+len("OUTTER: "))))
+
+				seen[innnerBQField.Name] = true
+				bqField = _traverseField(pkg, innnerBQField, inner, descriptor, level)
+			}
+		}
+	}
+	return bqField
 }
 
 func traverseFields(pkgName string, msg *descriptor.DescriptorProto) BQSchema {
-	results := make(BQSchema, 0)
-	pkg := locals.GetType(pkgName)
-
-	for _, f := range msg.GetField() {
-		field := NewBQField(
-			f.GetName(),
-			typeFromFieldType[f.GetType()],
-			modeFromFieldLabel[f.GetLabel()],
-			"description",
+	schema := make(BQSchema, 0)
+	pkg := locals.GetPackage(pkgName)
+	var bqField *BQField
+	fields := msg.GetField()
+	for _, fieldProto := range fields {
+		bqField = NewBQField(
+			fieldProto.GetJsonName(),
+			typeFromFieldType[fieldProto.GetType()],
+			modeFromFieldLabel[fieldProto.GetLabel()],
+			"",
 		)
-
-		if f.GetType() == descriptor.FieldDescriptorProto_TYPE_GROUP || f.GetType() == descriptor.FieldDescriptorProto_TYPE_MESSAGE {
-			n := strings.Split(f.GetTypeName(), ".")
-			nested := pkg.Index[n[2]]
-			for _, descriptorProto := range nested.GetField() {
-				x := _traverseFields(pkg, f)
-				field.Fields = append(field.Fields, x...)
-			}
+		if IsRecordType(fieldProto) {
+			bqField = _traverseField(pkg, bqField, fieldProto, getNested(pkg.Name, fieldProto), 0)
 		}
-		results = append(results, field)
+		schema = append(schema, bqField)
 	}
-	return results
+	return schema
 }
 
 func getFileForResponse(pkgName string, msg *descriptor.DescriptorProto) (*plugin.CodeGeneratorResponse_File, error) {
@@ -96,7 +134,7 @@ func getFileForResponse(pkgName string, msg *descriptor.DescriptorProto) (*plugi
 	tableName := opts.GetTableName()
 	schema := traverseFields(pkgName, msg)
 
-	if jsonSchema, err = json.MarshalIndent(schema, "", " "); err != nil {
+	if jsonSchema, err = json.MarshalIndent(schema, "", "\t"); err != nil {
 		return nil, err
 	}
 	resFile := &plugin.CodeGeneratorResponse_File{

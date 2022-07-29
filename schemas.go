@@ -1,14 +1,27 @@
 package main
 
+import (
+	"encoding/json"
+)
+
 type BQSchema []*BQField
 
 type BQField struct {
-	Name        string      `json:"Name"`
+	Name        string      `json:"name"`
 	Type        string      `json:"type"`
 	Mode        string      `json:"mode"`
 	Description string      `json:"description,omitempty"`
 	Fields      BQSchema    `json:"fields,omitempty"`
 	PolicyTags  *PolicyTags `json:"policyTags,omitempty"`
+}
+
+func (b *BQField) String() string {
+	return b.Name
+}
+
+func (b *BQField) JSON() string {
+	js, _ := json.MarshalIndent(b, "", " ")
+	return string(js)
 }
 
 type BQOption func(field *BQField)

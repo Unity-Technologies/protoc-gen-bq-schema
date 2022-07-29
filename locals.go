@@ -1,6 +1,8 @@
 package main
 
 import (
+	"strings"
+
 	plugin "github.com/golang/protobuf/protoc-gen-go/plugin"
 	"google.golang.org/protobuf/proto"
 	descriptor "google.golang.org/protobuf/types/descriptorpb"
@@ -14,6 +16,11 @@ type ProtoPackage struct {
 	Index    map[string]*descriptor.DescriptorProto
 	enums    map[string]*descriptor.EnumDescriptorProto
 	comments map[string]Comments
+}
+
+func (p *ProtoPackage) Get(typeName string) *descriptor.DescriptorProto {
+	n := strings.Split(typeName, ".")
+	return p.Index[n[len(n)-1]]
 }
 
 func (p *ProtoPackage) traverse() {
@@ -35,8 +42,12 @@ func (l *Locals) Set(key string, value *ProtoPackage) {
 	l.packages[key] = value
 }
 
-func (l Locals) GetType(key string) (value *ProtoPackage) {
+func (l Locals) GetPackage(key string) (value *ProtoPackage) {
 	return l.packages[key]
+}
+
+func (l Locals) GetTypeFromPackage(pkgName, key string) (value *descriptor.DescriptorProto) {
+	return l.GetPackage(pkgName).Get(key)
 }
 
 func InitLocals(req *plugin.CodeGeneratorRequest) Locals {
@@ -50,7 +61,7 @@ func InitLocals(req *plugin.CodeGeneratorRequest) Locals {
 		if _, ok := params[file.GetName()]; file.GetPackage() == "" && ok {
 			file.Package = proto.String(params[file.GetName()])
 		}
-		if pkg := l.GetType(file.GetPackage()); pkg == nil {
+		if pkg := l.GetPackage(file.GetPackage()); pkg == nil {
 			p := &ProtoPackage{
 				Name:     file.GetPackage(),
 				parent:   nil,
