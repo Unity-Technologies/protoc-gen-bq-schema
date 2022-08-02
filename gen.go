@@ -8,7 +8,6 @@ import (
 	"io/ioutil"
 	"os"
 	"strings"
-	"time"
 
 	"github.com/GoogleCloudPlatform/protoc-gen-bq-schema/protos"
 	"github.com/golang/glog"
@@ -47,54 +46,25 @@ func GetCodeGenRequestResponse(rd io.Reader) (*plugin.CodeGeneratorRequest, *plu
 	return req, resp
 }
 
-func nestedPrint(level int, msg string) {
-	glog.Error(fmt.Sprintf("%*s", level*2, msg))
-}
-
-func printFieldNames(bqField *BQField) {
-	tmp := []string{}
-	for _, bqField := range bqField.Fields {
-		tmp = append(tmp, bqField.Name)
-	}
-	glog.Error("FIELDS: ", strings.Join(tmp, ", "))
-}
-
-func max(v ...int) int {
-	var m int
-	if len(v) > 0 {
-		m = v[0]
-	}
-	for i, e := range v {
-		if i == 0 || e > m {
-			m = e
-		}
-	}
-	return m
-}
-
 var seen = map[string]bool{}
 
 func _traverseField(pkg *ProtoPackage, bqField *BQField, protoField *descriptor.FieldDescriptorProto, descriptor *descriptor.DescriptorProto, level int) *BQField {
 	if IsRecordType(protoField) {
 		level += 1
-		// nestedPrint(level, protoField.GetName())
 		descriptor = getNested(pkg.Name, protoField)
 		for _, inner := range descriptor.GetField() {
-			innnerBQField := NewBQField(
-				inner.GetJsonName(),
-				typeFromFieldType[inner.GetType()],
-				modeFromFieldLabel[inner.GetLabel()],
-				"",
-			)
-			bqField.Fields = append(bqField.Fields, innnerBQField)
-			time.Sleep(500 * time.Millisecond)
-			if _, ok := seen[innnerBQField.Name]; IsRecordType(inner) && !ok {
-				// glog.Error("\nOUTTER: ", bqField.JSON())
-				// glog.Error("\nINNER: ", innnerBQField.JSON())
-				// glog.Errorf("%s", strings.Repeat("=", max(len(bqField.Name)+len("OUTTER: "), len(innnerBQField.Name)+len("OUTTER: "))))
-
-				seen[innnerBQField.Name] = true
-				bqField = _traverseField(pkg, innnerBQField, inner, descriptor, level)
+			if _, found := seen[inner.GetName()]; !found {
+				innerBQField := NewBQField(
+					inner.GetJsonName(),
+					typeFromFieldType[inner.GetType()],
+					modeFromFieldLabel[inner.GetLabel()],
+					"",
+				)
+				bqField.Fields = append(bqField.Fields, innerBQField)
+				if _, ok := seen[innerBQField.Name]; IsRecordType(inner) && !ok {
+					seen[innerBQField.Name] = true
+					bqField = _traverseField(pkg, innerBQField, inner, descriptor, level)
+				}
 			}
 		}
 	}
@@ -130,11 +100,10 @@ func getFileForResponse(pkgName string, msg *descriptor.DescriptorProto) (*plugi
 	if opts, err = getBigqueryMessageOptions(msg); err != nil {
 		return nil, err
 	}
-
 	tableName := opts.GetTableName()
 	schema := traverseFields(pkgName, msg)
 
-	if jsonSchema, err = json.MarshalIndent(schema, "", "\t"); err != nil {
+	if jsonSchema, err = json.MarshalIndent(schema, "", " "); err != nil {
 		return nil, err
 	}
 	resFile := &plugin.CodeGeneratorResponse_File{
