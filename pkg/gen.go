@@ -1,4 +1,4 @@
-package main
+package pkg
 
 import (
 	"encoding/json"
@@ -16,7 +16,11 @@ import (
 	descriptor "google.golang.org/protobuf/types/descriptorpb"
 )
 
-var locals Locals
+var (
+	locals   Locals
+	comments Comments
+	seen     = map[string]bool{}
+)
 
 func getNested(pkgName string, fieldProto *descriptor.FieldDescriptorProto) *descriptor.DescriptorProto {
 	n := strings.Split(fieldProto.GetTypeName(), ".")
@@ -46,24 +50,32 @@ func GetCodeGenRequestResponse(rd io.Reader) (*plugin.CodeGeneratorRequest, *plu
 	return req, resp
 }
 
-var seen = map[string]bool{}
-
-func _traverseField(pkg *ProtoPackage, bqField *BQField, protoField *descriptor.FieldDescriptorProto, descriptor *descriptor.DescriptorProto, level int) *BQField {
+func _traverseField(pkg *ProtoPackage, bqField *BQField, protoField *descriptor.FieldDescriptorProto, desc *descriptor.DescriptorProto, path string) *BQField {
 	if IsRecordType(protoField) {
-		level += 1
-		descriptor = getNested(pkg.Name, protoField)
-		for _, inner := range descriptor.GetField() {
+		desc = getNested(pkg.Name, protoField)
+		for idx, inner := range desc.GetField() {
 			if _, found := seen[inner.GetName()]; !found {
+				var fieldCommentPath string
+
+				mode := modeFromFieldLabel[inner.GetLabel()]
+				fieldCommentPath = fmt.Sprintf("%s.%d.%d", path, subMessagePath, idx)
+				if comments[fieldCommentPath] == "" {
+					glog.Errorf("%s: %s", fieldCommentPath, inner.GetName())
+				}
 				innerBQField := NewBQField(
-					inner.GetJsonName(),
+					inner.GetName(),
 					typeFromFieldType[inner.GetType()],
-					modeFromFieldLabel[inner.GetLabel()],
-					"",
+					mode,
+					comments[fieldCommentPath],
 				)
-				bqField.Fields = append(bqField.Fields, innerBQField)
-				if _, ok := seen[innerBQField.Name]; IsRecordType(inner) && !ok {
-					seen[innerBQField.Name] = true
-					bqField = _traverseField(pkg, innerBQField, inner, descriptor, level)
+				if _, ok := seen[innerBQField.Name]; !ok {
+					if IsRecordType(inner) {
+						seen[innerBQField.Name] = true
+						innerBQField = _traverseField(pkg, innerBQField, inner, desc, path)
+						bqField.Fields = append(bqField.Fields, innerBQField)
+					} else {
+						bqField.Fields = append(bqField.Fields, innerBQField)
+					}
 				}
 			}
 		}
@@ -71,27 +83,29 @@ func _traverseField(pkg *ProtoPackage, bqField *BQField, protoField *descriptor.
 	return bqField
 }
 
-func traverseFields(pkgName string, msg *descriptor.DescriptorProto) BQSchema {
+func traverseFields(pkgName string, msg *descriptor.DescriptorProto, path string) BQSchema {
 	schema := make(BQSchema, 0)
 	pkg := locals.GetPackage(pkgName)
 	var bqField *BQField
 	fields := msg.GetField()
-	for _, fieldProto := range fields {
+	for idx, fieldProto := range fields {
+
+		fieldCommentPath := fmt.Sprintf("%s.%d.%d", path, fieldPath, idx)
 		bqField = NewBQField(
-			fieldProto.GetJsonName(),
+			fieldProto.GetName(),
 			typeFromFieldType[fieldProto.GetType()],
 			modeFromFieldLabel[fieldProto.GetLabel()],
-			"",
+			comments[fieldCommentPath],
 		)
 		if IsRecordType(fieldProto) {
-			bqField = _traverseField(pkg, bqField, fieldProto, getNested(pkg.Name, fieldProto), 0)
+			bqField = _traverseField(pkg, bqField, fieldProto, getNested(pkg.Name, fieldProto), fieldCommentPath)
 		}
 		schema = append(schema, bqField)
 	}
 	return schema
 }
 
-func getFileForResponse(pkgName string, msg *descriptor.DescriptorProto) (*plugin.CodeGeneratorResponse_File, error) {
+func getFileForResponse(pkgName string, msg *descriptor.DescriptorProto, path string) (*plugin.CodeGeneratorResponse_File, error) {
 	// p := fmt.Sprintf("%d.%d", messagePath, msgIndex)
 	var opts *protos.BigQueryMessageOptions
 	var jsonSchema []byte
@@ -101,7 +115,7 @@ func getFileForResponse(pkgName string, msg *descriptor.DescriptorProto) (*plugi
 		return nil, err
 	}
 	tableName := opts.GetTableName()
-	schema := traverseFields(pkgName, msg)
+	schema := traverseFields(pkgName, msg, path)
 
 	if jsonSchema, err = json.MarshalIndent(schema, "", " "); err != nil {
 		return nil, err
@@ -117,11 +131,11 @@ func getFilesForResponse(file *descriptor.FileDescriptorProto) ([]*plugin.CodeGe
 	var f *plugin.CodeGeneratorResponse_File
 	var err error
 
-	// comments := ParseComments(file)
 	responseFiles := make([]*plugin.CodeGeneratorResponse_File, 0)
 
-	for _, msg := range file.GetMessageType() {
-		if f, err = getFileForResponse(file.GetPackage(), msg); err != nil {
+	for msgIndex, msg := range file.GetMessageType() {
+		path := fmt.Sprintf("%d.%d", messagePath, msgIndex)
+		if f, err = getFileForResponse(file.GetPackage(), msg, path); err != nil {
 			return nil, err
 		}
 		responseFiles = append(responseFiles, f)
@@ -141,7 +155,44 @@ func writeResp(res *plugin.CodeGeneratorResponse) {
 	}
 }
 
-func main() {
+// handleSingleMessageOpt handles --bq-schema_opt=single-message in protoc params.
+// providing that param tells protoc-gen-bq-schema to treat each proto files only contains one top-level type.
+// if a file contains no message packages, then this function simply does nothing.
+// if a file contains more than one message packages, then only the first message type will be processed.
+// in that case, the table names will follow the proto file names.
+func handleSingleMessageOpt(file *descriptor.FileDescriptorProto, requestParam string) {
+	glog.Info("handleSingleMessageOpt")
+	if !strings.Contains(requestParam, "single-message") || len(file.GetMessageType()) == 0 {
+		return
+	}
+	file.MessageType = file.GetMessageType()[:1]
+	message := file.GetMessageType()[0]
+	message.Options = &descriptor.MessageOptions{}
+	fileName := file.GetName()
+	proto.SetExtension(message.GetOptions(), protos.E_BigqueryOpts, &protos.BigQueryMessageOptions{
+		TableName: fileName[strings.LastIndexByte(fileName, '/')+1 : strings.LastIndexByte(fileName, '.')],
+	})
+}
+
+// getBigqueryMessageOptions returns the bigquery options for the given message.
+// If an error is encountered, it is returned instead. If no error occurs, but
+// the message has no gen_bq_schema.bigquery_opts option, this function returns
+// nil, nil.
+func getBigqueryMessageOptions(msg *descriptor.DescriptorProto) (*protos.BigQueryMessageOptions, error) {
+	glog.Info("getBigqueryMessageOptions")
+	options := msg.GetOptions()
+	if options == nil {
+		return nil, nil
+	}
+
+	if !proto.HasExtension(options, protos.E_BigqueryOpts) {
+		return nil, nil
+	}
+
+	return proto.GetExtension(options, protos.E_BigqueryOpts).(*protos.BigQueryMessageOptions), nil
+}
+
+func Do() {
 	var req *plugin.CodeGeneratorRequest
 	var res *plugin.CodeGeneratorResponse
 	var converted []*plugin.CodeGeneratorResponse_File
@@ -160,6 +211,7 @@ func main() {
 
 	params := ParseRequestOptions(req.GetParameter())
 	for _, file := range req.GetProtoFile() {
+		comments = ParseComments(file)
 		handleSingleMessageOpt(file, req.GetParameter())
 		if _, ok := params[file.GetName()]; file.GetPackage() == "" && ok {
 			file.Package = proto.String(params[file.GetName()])
