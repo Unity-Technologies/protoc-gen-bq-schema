@@ -60,7 +60,7 @@ func _traverseField(pkg *ProtoPackage, bqField *BQField, protoField *descriptor.
 				mode := modeFromFieldLabel[inner.GetLabel()]
 				fieldCommentPath = fmt.Sprintf("%s.%d.%d", path, subMessagePath, idx)
 				if comments[fieldCommentPath] == "" {
-					glog.Errorf("%s: %s", fieldCommentPath, inner.GetName())
+					glog.Errorf("%s -> %s: %s", path, fieldCommentPath, inner.GetName())
 				}
 				innerBQField := NewBQField(
 					inner.GetName(),
@@ -84,9 +84,9 @@ func _traverseField(pkg *ProtoPackage, bqField *BQField, protoField *descriptor.
 }
 
 func traverseFields(pkgName string, msg *descriptor.DescriptorProto, path string) BQSchema {
+	var bqField *BQField
 	schema := make(BQSchema, 0)
 	pkg := locals.GetPackage(pkgName)
-	var bqField *BQField
 	fields := msg.GetField()
 	for idx, fieldProto := range fields {
 
