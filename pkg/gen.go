@@ -93,9 +93,10 @@ func _traverseField(pkgName string, bqField *BQField, protoField *descriptor.Fie
 					modeFromFieldLabel[inner.GetLabel()],
 					comments[fieldCommentPath],
 				)
-				if _, ok := seen[innerBQField.Name]; !ok {
+				k := fmt.Sprintf("%s.%s", innerBQField.Name, inner.GetTypeName())
+				if _, ok := seen[k]; !ok {
 					if IsRecordType(inner) {
-						seen[innerBQField.Name] = true
+						seen[k] = true
 						innerBQField = _traverseField(pkgName, innerBQField, inner, desc)
 						bqField.Fields = append(bqField.Fields, innerBQField)
 					} else {
