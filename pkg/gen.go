@@ -55,23 +55,29 @@ func _traverseField(pkg *ProtoPackage, bqField *BQField, protoField *descriptor.
 		desc = getNested(pkg.Name, protoField)
 		for idx, inner := range desc.GetField() {
 			if _, found := seen[inner.GetName()]; !found {
-				var fieldCommentPath string
+				var comment, fieldCommentPath string
+				var ok bool
 
-				mode := modeFromFieldLabel[inner.GetLabel()]
-				fieldCommentPath = fmt.Sprintf("%s.%d.%d", path, subMessagePath, idx)
-				if comments[fieldCommentPath] == "" {
-					glog.Errorf("%s -> %s: %s", path, fieldCommentPath, inner.GetName())
+				fieldCommentPath = fmt.Sprintf("%s.%d.%d", path, subMessagePath, inner.GetNumber())
+				if comment, ok = comments[fieldCommentPath]; !ok {
+					if inner.GetTypeName() != "" {
+						fieldCommentPath = fmt.Sprintf("%s.%d.%d", fieldCommentPath, fieldPath, idx)
+						comment = comments[fieldCommentPath]
+					}
+				}
+				if comment == "" {
+					glog.Errorf("%s: %s", fieldCommentPath, inner.GetName())
 				}
 				innerBQField := NewBQField(
 					inner.GetName(),
 					typeFromFieldType[inner.GetType()],
-					mode,
-					comments[fieldCommentPath],
+					modeFromFieldLabel[inner.GetLabel()],
+					comment,
 				)
 				if _, ok := seen[innerBQField.Name]; !ok {
 					if IsRecordType(inner) {
 						seen[innerBQField.Name] = true
-						innerBQField = _traverseField(pkg, innerBQField, inner, desc, path)
+						innerBQField = _traverseField(pkg, innerBQField, inner, desc, fieldCommentPath)
 						bqField.Fields = append(bqField.Fields, innerBQField)
 					} else {
 						bqField.Fields = append(bqField.Fields, innerBQField)
@@ -98,7 +104,7 @@ func traverseFields(pkgName string, msg *descriptor.DescriptorProto, path string
 			comments[fieldCommentPath],
 		)
 		if IsRecordType(fieldProto) {
-			bqField = _traverseField(pkg, bqField, fieldProto, getNested(pkg.Name, fieldProto), fieldCommentPath)
+			bqField = _traverseField(pkg, bqField, fieldProto, getNested(pkg.Name, fieldProto), path)
 		}
 		schema = append(schema, bqField)
 	}

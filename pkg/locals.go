@@ -18,6 +18,11 @@ type ProtoPackage struct {
 	comments map[string]Comments
 }
 
+type ProtoType struct {
+	Type *descriptor.DescriptorProto
+	Path string
+}
+
 func (p *ProtoPackage) Get(typeName string) *descriptor.DescriptorProto {
 	n := strings.Split(typeName, ".")
 	return p.Index[n[len(n)-1]]
@@ -57,6 +62,19 @@ func InitLocals(req *plugin.CodeGeneratorRequest) Locals {
 	}
 	params := ParseRequestOptions(req.GetParameter())
 	for _, file := range req.GetProtoFile() {
+		// for _, loc := range file.GetSourceCodeInfo().GetLocation() {
+		// 	if !hasComment(loc) {
+		// 		continue
+		// 	}
+		//
+		// 	path := loc.GetPath()
+		// 	key := make([]string, len(path))
+		// 	for idx, p := range path {
+		// 		key[idx] = strconv.FormatInt(int64(p), 10)
+		// 	}
+		//
+		// 	comments[strings.Join(key, ".")] = buildComment(loc)
+		// }
 		handleSingleMessageOpt(file, req.GetParameter())
 		if _, ok := params[file.GetName()]; file.GetPackage() == "" && ok {
 			file.Package = proto.String(params[file.GetName()])
