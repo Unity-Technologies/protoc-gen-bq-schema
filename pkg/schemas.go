@@ -1,7 +1,7 @@
 package pkg
 
 import (
-	"encoding/json"
+	"fmt"
 )
 
 type BQSchema []*BQField
@@ -16,12 +16,7 @@ type BQField struct {
 }
 
 func (b *BQField) String() string {
-	return b.Name
-}
-
-func (b *BQField) JSON() string {
-	js, _ := json.MarshalIndent(b, "", " ")
-	return string(js)
+	return fmt.Sprintf("<BQField: %s %s %s>", b.Mode, b.Name, b.Type)
 }
 
 type BQOption func(field *BQField)

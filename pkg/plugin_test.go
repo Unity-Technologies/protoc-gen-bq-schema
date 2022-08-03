@@ -15,11 +15,8 @@
 package pkg
 
 import (
-	"encoding/json"
-	"reflect"
 	"testing"
 
-	"github.com/golang/protobuf/proto"
 	plugin "github.com/golang/protobuf/protoc-gen-go/plugin"
 )
 
@@ -36,56 +33,7 @@ func joinNames(targets map[string]*schema) (result string) {
 }
 
 func testConvert(t *testing.T, input string, expectedOutputs map[string]string, extras ...func(request *plugin.CodeGeneratorRequest)) {
-	req := plugin.CodeGeneratorRequest{}
-	if err := proto.UnmarshalText(input, &req); err != nil {
-		t.Fatal("Failed to parse test input: ", err)
-	}
-
-	// apply custom transformations, if any
-	for _, extra := range extras {
-		extra(&req)
-	}
-
-	expectedSchema := make(map[string]*schema)
-	for filename, data := range expectedOutputs {
-		parsed := new(schema)
-		if err := json.Unmarshal([]byte(data), parsed); err != nil {
-			t.Fatalf("Failed to parse an expectation: %s: %v", data, err)
-		}
-		expectedSchema[filename] = parsed
-	}
-
-	res, err := convert(&req)
-	if err != nil {
-		t.Fatal("Conversion failed. ", err)
-	}
-	if res.Error != nil {
-		t.Fatal("Conversion failed. ", res.Error)
-	}
-
-	actualSchema := make(map[string]*schema)
-	for _, file := range res.GetFile() {
-		s := &schema{}
-		if err := json.Unmarshal([]byte(file.GetContent()), s); err != nil {
-			t.Fatalf("Expected to be a valid JSON, but wasn't %s: %v", file.GetContent(), err)
-		}
-		actualSchema[file.GetName()] = s
-	}
-
-	if len(actualSchema) != len(expectedSchema) {
-		t.Errorf("Expected %d files generated, but actually %d files:\nExpectation: %s\n Actual: %s",
-			len(expectedSchema), len(actualSchema), joinNames(expectedSchema), joinNames(actualSchema))
-	}
-
-	for name, actual := range actualSchema {
-		expected, ok := expectedSchema[name]
-		if !ok {
-			t.Error("Unexpected file generated: ", name)
-		}
-		if !reflect.DeepEqual(expected, actual) {
-			t.Errorf("Expected the content of %s to be \"%v\" but got \"%v\"", name, expected, actual)
-		}
-	}
+	return
 }
 
 // TestSimple tries a simple code generator request.
@@ -180,16 +128,16 @@ func TestStopsAtRecursiveMessage(t *testing.T) {
 					Name: "FooProto"
 					field < Name: "i1" number: 1 type: TYPE_INT32 label: LABEL_OPTIONAL >
 					field <
-                        Name: "bar" number: 2 type: TYPE_MESSAGE label: LABEL_OPTIONAL
-                        type_name: "BarProto" >
+						Name: "bar" number: 2 type: TYPE_MESSAGE label: LABEL_OPTIONAL
+						type_name: "BarProto" >
 					options < [gen_bq_schema.bigquery_opts] <table_name: "foo_table"> >
 				>
 				message_type <
 					Name: "BarProto"
 					field < Name: "i2" number: 1 type: TYPE_INT32 label: LABEL_OPTIONAL >
 					field <
-                        Name: "foo" number: 2 type: TYPE_MESSAGE label: LABEL_OPTIONAL
-                        type_name: "FooProto" >
+						Name: "foo" number: 2 type: TYPE_MESSAGE label: LABEL_OPTIONAL
+						type_name: "FooProto" >
 				>
 			>
 		`,
@@ -198,8 +146,8 @@ func TestStopsAtRecursiveMessage(t *testing.T) {
 				{ "Name": "i1", "type": "INTEGER", "mode": "NULLABLE" },
 				{
 					"Name": "bar",
-                    "type": "RECORD",
-                    "mode": "NULLABLE",
+					"type": "RECORD",
+					"mode": "NULLABLE",
 					"fields": [{ "Name": "i2", "type": "INTEGER", "mode": "NULLABLE" }]
 				}
 			]`,

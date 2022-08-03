@@ -17,12 +17,42 @@ import (
 )
 
 var (
-	locals   Locals
-	comments Comments
-	seen     = map[string]bool{}
+	locals            Locals
+	comments          Comments
+	seen              = map[string]bool{}
+	typeFromFieldType = map[descriptor.FieldDescriptorProto_Type]string{
+		descriptor.FieldDescriptorProto_TYPE_DOUBLE: "FLOAT",
+		descriptor.FieldDescriptorProto_TYPE_FLOAT:  "FLOAT",
+
+		descriptor.FieldDescriptorProto_TYPE_INT64:    "INTEGER",
+		descriptor.FieldDescriptorProto_TYPE_UINT64:   "INTEGER",
+		descriptor.FieldDescriptorProto_TYPE_INT32:    "INTEGER",
+		descriptor.FieldDescriptorProto_TYPE_UINT32:   "INTEGER",
+		descriptor.FieldDescriptorProto_TYPE_FIXED64:  "INTEGER",
+		descriptor.FieldDescriptorProto_TYPE_FIXED32:  "INTEGER",
+		descriptor.FieldDescriptorProto_TYPE_SFIXED32: "INTEGER",
+		descriptor.FieldDescriptorProto_TYPE_SFIXED64: "INTEGER",
+		descriptor.FieldDescriptorProto_TYPE_SINT32:   "INTEGER",
+		descriptor.FieldDescriptorProto_TYPE_SINT64:   "INTEGER",
+
+		descriptor.FieldDescriptorProto_TYPE_STRING: "STRING",
+		descriptor.FieldDescriptorProto_TYPE_BYTES:  "BYTES",
+		descriptor.FieldDescriptorProto_TYPE_ENUM:   "STRING",
+
+		descriptor.FieldDescriptorProto_TYPE_BOOL: "BOOLEAN",
+
+		descriptor.FieldDescriptorProto_TYPE_GROUP:   "RECORD",
+		descriptor.FieldDescriptorProto_TYPE_MESSAGE: "RECORD",
+	}
+
+	modeFromFieldLabel = map[descriptor.FieldDescriptorProto_Label]string{
+		descriptor.FieldDescriptorProto_LABEL_OPTIONAL: "NULLABLE",
+		descriptor.FieldDescriptorProto_LABEL_REQUIRED: "REQUIRED",
+		descriptor.FieldDescriptorProto_LABEL_REPEATED: "REPEATED",
+	}
 )
 
-func getNested(pkgName string, fieldProto *descriptor.FieldDescriptorProto) *descriptor.DescriptorProto {
+func getNested(pkgName string, fieldProto *descriptor.FieldDescriptorProto) *ProtoType {
 	n := strings.Split(fieldProto.GetTypeName(), ".")
 	return locals.GetTypeFromPackage(pkgName, n[len(n)-1])
 }
@@ -50,34 +80,23 @@ func GetCodeGenRequestResponse(rd io.Reader) (*plugin.CodeGeneratorRequest, *plu
 	return req, resp
 }
 
-func _traverseField(pkg *ProtoPackage, bqField *BQField, protoField *descriptor.FieldDescriptorProto, desc *descriptor.DescriptorProto, path string) *BQField {
+func _traverseField(pkgName string, bqField *BQField, protoField *descriptor.FieldDescriptorProto, desc *descriptor.DescriptorProto) *BQField {
 	if IsRecordType(protoField) {
-		desc = getNested(pkg.Name, protoField)
+		pt := getNested(pkgName, protoField)
+		desc = pt.Type
 		for idx, inner := range desc.GetField() {
 			if _, found := seen[inner.GetName()]; !found {
-				var comment, fieldCommentPath string
-				var ok bool
-
-				fieldCommentPath = fmt.Sprintf("%s.%d.%d", path, subMessagePath, inner.GetNumber())
-				if comment, ok = comments[fieldCommentPath]; !ok {
-					if inner.GetTypeName() != "" {
-						fieldCommentPath = fmt.Sprintf("%s.%d.%d", fieldCommentPath, fieldPath, idx)
-						comment = comments[fieldCommentPath]
-					}
-				}
-				if comment == "" {
-					glog.Errorf("%s: %s", fieldCommentPath, inner.GetName())
-				}
+				fieldCommentPath := fmt.Sprintf("%s.%d.%d", pt.Path, fieldPath, idx)
 				innerBQField := NewBQField(
 					inner.GetName(),
 					typeFromFieldType[inner.GetType()],
 					modeFromFieldLabel[inner.GetLabel()],
-					comment,
+					comments[fieldCommentPath],
 				)
 				if _, ok := seen[innerBQField.Name]; !ok {
 					if IsRecordType(inner) {
 						seen[innerBQField.Name] = true
-						innerBQField = _traverseField(pkg, innerBQField, inner, desc, fieldCommentPath)
+						innerBQField = _traverseField(pkgName, innerBQField, inner, desc)
 						bqField.Fields = append(bqField.Fields, innerBQField)
 					} else {
 						bqField.Fields = append(bqField.Fields, innerBQField)
@@ -92,7 +111,6 @@ func _traverseField(pkg *ProtoPackage, bqField *BQField, protoField *descriptor.
 func traverseFields(pkgName string, msg *descriptor.DescriptorProto, path string) BQSchema {
 	var bqField *BQField
 	schema := make(BQSchema, 0)
-	pkg := locals.GetPackage(pkgName)
 	fields := msg.GetField()
 	for idx, fieldProto := range fields {
 
@@ -104,7 +122,7 @@ func traverseFields(pkgName string, msg *descriptor.DescriptorProto, path string
 			comments[fieldCommentPath],
 		)
 		if IsRecordType(fieldProto) {
-			bqField = _traverseField(pkg, bqField, fieldProto, getNested(pkg.Name, fieldProto), path)
+			bqField = _traverseField(pkgName, bqField, fieldProto, getNested(pkgName, fieldProto).Type)
 		}
 		schema = append(schema, bqField)
 	}
@@ -139,9 +157,9 @@ func getFilesForResponse(file *descriptor.FileDescriptorProto) ([]*plugin.CodeGe
 
 	responseFiles := make([]*plugin.CodeGeneratorResponse_File, 0)
 
-	for msgIndex, msg := range file.GetMessageType() {
-		path := fmt.Sprintf("%d.%d", messagePath, msgIndex)
-		if f, err = getFileForResponse(file.GetPackage(), msg, path); err != nil {
+	for _, msg := range file.GetMessageType() {
+		pt := locals.GetTypeFromPackage(file.GetPackage(), msg.GetName())
+		if f, err = getFileForResponse(file.GetPackage(), msg, pt.Path); err != nil {
 			return nil, err
 		}
 		responseFiles = append(responseFiles, f)
