@@ -57,4 +57,10 @@ examples: $(BQ_PLUGIN)
 
 run:
 	go build -o ~/bin/protoc-gen-bq-schema cmd/main.go
-	protoc -I ~/commerce/commerce-apis/ -I ~/commerce/commerce-apis/third_party/ --bq-schema_out=.scratch --bq-schema_opt=single-message --bq-schema_opt=Mcommerce/subscription.renewed.proto=subscription commerce/subscription.renewed.proto
+	protoc \
+		-I ~/commerce/commerce-apis/ \
+		-I ~/commerce/commerce-apis/third_party/ \
+		--bq-schema_out=.scratch \
+		--bq-schema_opt=single-message \
+		--bq-schema_opt=Mcommerce/order.created.proto=subscription \
+		~/commerce/commerce-apis/commerce/order.created.proto

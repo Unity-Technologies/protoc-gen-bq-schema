@@ -111,6 +111,10 @@ func traverseMessage(pkgName string, msg *descriptor.DescriptorProto, path strin
 	var bqField *BQField
 	schema := make(BQSchema, 0)
 	fields := msg.GetField()
+	if parentMessages[msg] {
+		glog.Errorf("Detected recursion for message %s, ignoring subfields", *msg.Name)
+		return nil
+	}
 	parentMessages[msg] = true
 	for idx, fieldProto := range fields {
 		fieldCommentPath := fmt.Sprintf("%s.%d.%d", path, fieldPath, idx)
