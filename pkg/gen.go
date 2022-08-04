@@ -80,12 +80,12 @@ func GetCodeGenRequestResponse(rd io.Reader) (*plugin.CodeGeneratorRequest, *plu
 	return req, resp
 }
 
-func _traverseField(pkgName string, bqField *BQField, protoField *descriptor.FieldDescriptorProto, desc *descriptor.DescriptorProto) *BQField {
+func _traverseField(pkgName string, bqField *BQField, protoField *descriptor.FieldDescriptorProto, desc *descriptor.DescriptorProto, parentMessages map[*descriptor.DescriptorProto]bool) *BQField {
 	if IsRecordType(protoField) {
 		pt := getNested(pkgName, protoField)
 		desc = pt.Type
 		for idx, inner := range desc.GetField() {
-			if _, found := seen[inner]; !found {
+			if _, found := parentMessages[desc]; !found {
 				fieldCommentPath := fmt.Sprintf("%s.%d.%d", pt.Path, fieldPath, idx)
 				innerBQField := NewBQField(
 					inner.GetName(),
@@ -93,10 +93,9 @@ func _traverseField(pkgName string, bqField *BQField, protoField *descriptor.Fie
 					modeFromFieldLabel[inner.GetLabel()],
 					comments[fieldCommentPath],
 				)
-				if _, ok := seen[inner]; !ok {
+				if _, ok := parentMessages[desc]; !ok {
 					if IsRecordType(inner) {
-						seen[inner] = true
-						innerBQField = _traverseField(pkgName, innerBQField, inner, desc)
+						innerBQField = _traverseField(pkgName, innerBQField, inner, desc, parentMessages)
 						bqField.Fields = append(bqField.Fields, innerBQField)
 					} else {
 						bqField.Fields = append(bqField.Fields, innerBQField)
@@ -108,12 +107,12 @@ func _traverseField(pkgName string, bqField *BQField, protoField *descriptor.Fie
 	return bqField
 }
 
-func traverseFields(pkgName string, msg *descriptor.DescriptorProto, path string) BQSchema {
+func traverseMessage(pkgName string, msg *descriptor.DescriptorProto, path string, parentMessages map[*descriptor.DescriptorProto]bool) BQSchema {
 	var bqField *BQField
 	schema := make(BQSchema, 0)
 	fields := msg.GetField()
+	parentMessages[msg] = true
 	for idx, fieldProto := range fields {
-
 		fieldCommentPath := fmt.Sprintf("%s.%d.%d", path, fieldPath, idx)
 		bqField = NewBQField(
 			fieldProto.GetName(),
@@ -122,15 +121,15 @@ func traverseFields(pkgName string, msg *descriptor.DescriptorProto, path string
 			comments[fieldCommentPath],
 		)
 		if IsRecordType(fieldProto) {
-			bqField = _traverseField(pkgName, bqField, fieldProto, getNested(pkgName, fieldProto).Type)
+			bqField = _traverseField(pkgName, bqField, fieldProto, getNested(pkgName, fieldProto).Type, parentMessages)
 		}
 		schema = append(schema, bqField)
 	}
+	parentMessages[msg] = false
 	return schema
 }
 
-func getFileForResponse(pkgName string, msg *descriptor.DescriptorProto, path string) (*plugin.CodeGeneratorResponse_File, error) {
-	// p := fmt.Sprintf("%d.%d", messagePath, msgIndex)
+func getFileForResponse(pkgName string, msg *descriptor.DescriptorProto, path string, parentMessages map[*descriptor.DescriptorProto]bool) (*plugin.CodeGeneratorResponse_File, error) {
 	var opts *protos.BigQueryMessageOptions
 	var jsonSchema []byte
 	var err error
@@ -139,7 +138,7 @@ func getFileForResponse(pkgName string, msg *descriptor.DescriptorProto, path st
 		return nil, err
 	}
 	tableName := opts.GetTableName()
-	schema := traverseFields(pkgName, msg, path)
+	schema := traverseMessage(pkgName, msg, path, parentMessages)
 
 	if jsonSchema, err = json.MarshalIndent(schema, "", " "); err != nil {
 		return nil, err
@@ -156,10 +155,9 @@ func getFilesForResponse(file *descriptor.FileDescriptorProto) ([]*plugin.CodeGe
 	var err error
 
 	responseFiles := make([]*plugin.CodeGeneratorResponse_File, 0)
-
 	for _, msg := range file.GetMessageType() {
 		pt := locals.GetTypeFromPackage(file.GetPackage(), msg.GetName())
-		if f, err = getFileForResponse(file.GetPackage(), msg, pt.Path); err != nil {
+		if f, err = getFileForResponse(file.GetPackage(), msg, pt.Path, map[*descriptor.DescriptorProto]bool{}); err != nil {
 			return nil, err
 		}
 		responseFiles = append(responseFiles, f)
