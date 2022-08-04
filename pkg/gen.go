@@ -84,25 +84,23 @@ func _traverseField(pkgName string, bqField *BQField, protoField *descriptor.Fie
 	if IsRecordType(protoField) {
 		pt := getNested(pkgName, protoField)
 		desc = pt.Type
-		if _, found := parentMessages[desc]; !found {
-			parentMessages[desc] = true
-			for idx, inner := range desc.GetField() {
-				fieldCommentPath := fmt.Sprintf("%s.%d.%d", pt.Path, fieldPath, idx)
-				innerBQField := NewBQField(
-					inner.GetName(),
-					typeFromFieldType[inner.GetType()],
-					modeFromFieldLabel[inner.GetLabel()],
-					comments[fieldCommentPath],
-				)
-				if IsRecordType(inner) {
-					innerBQField = _traverseField(pkgName, innerBQField, inner, desc, parentMessages)
-					bqField.Fields = append(bqField.Fields, innerBQField)
-				} else {
-					bqField.Fields = append(bqField.Fields, innerBQField)
-				}
+		parentMessages[desc] = true
+		for idx, inner := range desc.GetField() {
+			fieldCommentPath := fmt.Sprintf("%s.%d.%d", pt.Path, fieldPath, idx)
+			innerBQField := NewBQField(
+				inner.GetName(),
+				typeFromFieldType[inner.GetType()],
+				modeFromFieldLabel[inner.GetLabel()],
+				comments[fieldCommentPath],
+			)
+			if IsRecordType(inner) {
+				innerBQField = _traverseField(pkgName, innerBQField, inner, desc, parentMessages)
+				bqField.Fields = append(bqField.Fields, innerBQField)
+			} else {
+				bqField.Fields = append(bqField.Fields, innerBQField)
 			}
-			parentMessages[desc] = false
 		}
+		parentMessages[desc] = false
 	}
 	return bqField
 }
