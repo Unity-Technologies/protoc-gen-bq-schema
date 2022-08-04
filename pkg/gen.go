@@ -84,8 +84,9 @@ func _traverseField(pkgName string, bqField *BQField, protoField *descriptor.Fie
 	if IsRecordType(protoField) {
 		pt := getNested(pkgName, protoField)
 		desc = pt.Type
-		for idx, inner := range desc.GetField() {
-			if _, found := parentMessages[desc]; !found {
+		if _, found := parentMessages[desc]; !found {
+			parentMessages[desc] = true
+			for idx, inner := range desc.GetField() {
 				fieldCommentPath := fmt.Sprintf("%s.%d.%d", pt.Path, fieldPath, idx)
 				innerBQField := NewBQField(
 					inner.GetName(),
