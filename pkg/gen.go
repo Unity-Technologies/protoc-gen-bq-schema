@@ -19,7 +19,7 @@ import (
 var (
 	locals            Locals
 	comments          Comments
-	seen              = map[string]bool{}
+	seen              = map[*descriptor.FieldDescriptorProto]bool{}
 	typeFromFieldType = map[descriptor.FieldDescriptorProto_Type]string{
 		descriptor.FieldDescriptorProto_TYPE_DOUBLE: "FLOAT",
 		descriptor.FieldDescriptorProto_TYPE_FLOAT:  "FLOAT",
@@ -85,7 +85,7 @@ func _traverseField(pkgName string, bqField *BQField, protoField *descriptor.Fie
 		pt := getNested(pkgName, protoField)
 		desc = pt.Type
 		for idx, inner := range desc.GetField() {
-			if _, found := seen[inner.GetName()]; !found {
+			if _, found := seen[inner]; !found {
 				fieldCommentPath := fmt.Sprintf("%s.%d.%d", pt.Path, fieldPath, idx)
 				innerBQField := NewBQField(
 					inner.GetName(),
@@ -93,10 +93,9 @@ func _traverseField(pkgName string, bqField *BQField, protoField *descriptor.Fie
 					modeFromFieldLabel[inner.GetLabel()],
 					comments[fieldCommentPath],
 				)
-				k := fmt.Sprintf("%s.%s", innerBQField.Name, inner.GetTypeName())
-				if _, ok := seen[k]; !ok {
+				if _, ok := seen[inner]; !ok {
 					if IsRecordType(inner) {
-						seen[k] = true
+						seen[inner] = true
 						innerBQField = _traverseField(pkgName, innerBQField, inner, desc)
 						bqField.Fields = append(bqField.Fields, innerBQField)
 					} else {
