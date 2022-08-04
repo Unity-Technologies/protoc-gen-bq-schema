@@ -84,7 +84,7 @@ func _traverseField(pkgName string, bqField *BQField, protoField *descriptor.Fie
 	if IsRecordType(protoField) {
 		pt := getNested(pkgName, protoField)
 		desc = pt.Type
-		if parentMessages[msg] {
+		if parentMessages[desc] {
 			glog.Errorf("Detected recursion for message %s, ignoring subfields", desc.GetName())
 			return nil
 		}
