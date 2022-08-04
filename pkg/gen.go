@@ -100,6 +100,7 @@ func _traverseField(pkgName string, bqField *BQField, protoField *descriptor.Fie
 					bqField.Fields = append(bqField.Fields, innerBQField)
 				} else {
 					bqField.Fields = append(bqField.Fields, innerBQField)
+					parentMessages[desc] = false
 				}
 				if _, ok := parentMessages[desc]; !ok {
 
