@@ -93,14 +93,15 @@ func _traverseField(pkgName string, bqField *BQField, protoField *descriptor.Fie
 					modeFromFieldLabel[inner.GetLabel()],
 					comments[fieldCommentPath],
 				)
+				if IsRecordType(inner) {
+					innerBQField = _traverseField(pkgName, innerBQField, inner, desc, parentMessages)
+					bqField.Fields = append(bqField.Fields, innerBQField)
+					parentMessages[desc] = false
+				} else {
+					bqField.Fields = append(bqField.Fields, innerBQField)
+				}
 				if _, ok := parentMessages[desc]; !ok {
-					if IsRecordType(inner) {
-						innerBQField = _traverseField(pkgName, innerBQField, inner, desc, parentMessages)
-						bqField.Fields = append(bqField.Fields, innerBQField)
-						parentMessages[desc] = false
-					} else {
-						bqField.Fields = append(bqField.Fields, innerBQField)
-					}
+
 				}
 			}
 		}
