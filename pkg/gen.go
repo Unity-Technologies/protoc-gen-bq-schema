@@ -95,8 +95,10 @@ func _traverseField(pkgName string, bqField *BQField, protoField *descriptor.Fie
 				)
 				if _, ok := parentMessages[desc]; !ok {
 					if IsRecordType(inner) {
+						parentMessages[desc] = true
 						innerBQField = _traverseField(pkgName, innerBQField, inner, desc, parentMessages)
 						bqField.Fields = append(bqField.Fields, innerBQField)
+						parentMessages[desc] = false
 					} else {
 						bqField.Fields = append(bqField.Fields, innerBQField)
 					}
