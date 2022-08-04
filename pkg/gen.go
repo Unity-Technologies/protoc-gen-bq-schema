@@ -86,7 +86,7 @@ func _traverseField(pkgName string, bqField *BQField, protoField *descriptor.Fie
 		desc = pt.Type
 		if parentMessages[desc] {
 			glog.Errorf("Detected recursion for message %s, ignoring subfields", desc.GetName())
-			return nil
+			return bqField
 		}
 		parentMessages[desc] = true
 		for idx, inner := range desc.GetField() {
@@ -99,9 +99,13 @@ func _traverseField(pkgName string, bqField *BQField, protoField *descriptor.Fie
 			)
 			if IsRecordType(inner) {
 				innerBQField = _traverseField(pkgName, innerBQField, inner, desc, parentMessages)
-				bqField.Fields = append(bqField.Fields, innerBQField)
+				if innerBQField != nil {
+					bqField.Fields = append(bqField.Fields, innerBQField)
+				}
 			} else {
-				bqField.Fields = append(bqField.Fields, innerBQField)
+				if innerBQField != nil {
+					bqField.Fields = append(bqField.Fields, innerBQField)
+				}
 			}
 		}
 		parentMessages[desc] = false
@@ -129,7 +133,9 @@ func traverseMessage(pkgName string, msg *descriptor.DescriptorProto, path strin
 		if IsRecordType(fieldProto) {
 			bqField = _traverseField(pkgName, bqField, fieldProto, getNested(pkgName, fieldProto).Type, parentMessages)
 		}
-		schema = append(schema, bqField)
+		if bqField != nil {
+			schema = append(schema, bqField)
+		}
 	}
 	parentMessages[msg] = false
 	return schema
