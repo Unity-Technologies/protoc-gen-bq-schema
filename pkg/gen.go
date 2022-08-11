@@ -19,7 +19,6 @@ import (
 var (
 	locals            Locals
 	comments          Comments
-	seen              = map[*descriptor.FieldDescriptorProto]bool{}
 	typeFromFieldType = map[descriptor.FieldDescriptorProto_Type]string{
 		descriptor.FieldDescriptorProto_TYPE_DOUBLE: "FLOAT",
 		descriptor.FieldDescriptorProto_TYPE_FLOAT:  "FLOAT",
@@ -80,7 +79,7 @@ func GetCodeGenRequestResponse(rd io.Reader) (*plugin.CodeGeneratorRequest, *plu
 	return req, resp
 }
 
-func _traverseField(pkgName string, bqField *BQField, protoField *descriptor.FieldDescriptorProto, desc *descriptor.DescriptorProto, parentMessages map[*descriptor.DescriptorProto]bool) *BQField {
+func _traverseField(pkgName string, bqField *Field, protoField *descriptor.FieldDescriptorProto, desc *descriptor.DescriptorProto, parentMessages map[*descriptor.DescriptorProto]bool) *Field {
 	if IsRecordType(protoField) {
 		pt := getNested(pkgName, protoField)
 		desc = pt.Type
@@ -113,9 +112,9 @@ func _traverseField(pkgName string, bqField *BQField, protoField *descriptor.Fie
 	return bqField
 }
 
-func traverseMessage(pkgName string, msg *descriptor.DescriptorProto, path string, parentMessages map[*descriptor.DescriptorProto]bool) BQSchema {
-	var bqField *BQField
-	schema := make(BQSchema, 0)
+func traverseMessage(pkgName string, msg *descriptor.DescriptorProto, path string, parentMessages map[*descriptor.DescriptorProto]bool) Schema {
+	var bqField *Field
+	schema := make(Schema, 0)
 	fields := msg.GetField()
 	if parentMessages[msg] {
 		glog.Errorf("Detected recursion for message %s, ignoring subfields", msg.GetName())

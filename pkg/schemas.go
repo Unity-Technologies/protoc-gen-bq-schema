@@ -4,31 +4,31 @@ import (
 	"fmt"
 )
 
-type BQSchema []*BQField
+type Schema []*Field
 
-type BQField struct {
+type Field struct {
 	Name        string      `json:"name"`
 	Type        string      `json:"type"`
 	Mode        string      `json:"mode"`
 	Description string      `json:"description,omitempty"`
-	Fields      BQSchema    `json:"fields,omitempty"`
+	Fields      Schema      `json:"fields,omitempty"`
 	PolicyTags  *PolicyTags `json:"policyTags,omitempty"`
 }
 
-func (b *BQField) String() string {
-	return fmt.Sprintf("<BQField: %s %s %s>", b.Mode, b.Name, b.Type)
+func (b *Field) String() string {
+	return fmt.Sprintf("<Field: %s %s %s>", b.Mode, b.Name, b.Type)
 }
 
-type BQOption func(field *BQField)
+type BQOption func(field *Field)
 
-func WithFields(fields BQSchema) BQOption {
-	return func(field *BQField) {
+func WithFields(fields Schema) BQOption {
+	return func(field *Field) {
 		field.Fields = fields
 	}
 }
 
-func NewBQField(name string, type_ string, mode string, description string, opts ...BQOption) *BQField {
-	f := &BQField{Name: name, Type: type_, Mode: mode, Description: description}
+func NewBQField(name string, type_ string, mode string, description string, opts ...BQOption) *Field {
+	f := &Field{Name: name, Type: type_, Mode: mode, Description: description}
 	for _, opt := range opts {
 		opt(f)
 	}
