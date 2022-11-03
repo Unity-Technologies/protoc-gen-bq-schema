@@ -12,7 +12,11 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
+<<<<<<<< HEAD:pkg/field_option_test.go
 package pkg
+========
+package converter
+>>>>>>>> 34288dc182e30d74eeeee6c15cc1e11f537eae1b:pkg/converter/field_option_test.go
 
 import (
 	"testing"

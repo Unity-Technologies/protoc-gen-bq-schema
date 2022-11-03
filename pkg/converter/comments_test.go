@@ -1,10 +1,14 @@
+<<<<<<<< HEAD:pkg/comments_test.go
 package pkg
+========
+package converter
+>>>>>>>> 34288dc182e30d74eeeee6c15cc1e11f537eae1b:pkg/converter/comments_test.go
 
 import (
 	"reflect"
 	"testing"
 
-	"github.com/golang/protobuf/protoc-gen-go/descriptor"
+	descriptor "google.golang.org/protobuf/types/descriptorpb"
 )
 
 func TestParseComments(t *testing.T) {
@@ -16,12 +20,12 @@ func TestParseComments(t *testing.T) {
 		&descriptor.FileDescriptorProto{
 			SourceCodeInfo: &descriptor.SourceCodeInfo{
 				Location: []*descriptor.SourceCodeInfo_Location{
-					&descriptor.SourceCodeInfo_Location{
+					{
 						Path:             []int32{4, 0},
 						LeadingComments:  &leadingComment,
 						TrailingComments: &trailingComment,
 					},
-					&descriptor.SourceCodeInfo_Location{
+					{
 						Path:             []int32{4, 0, 3, 0, 2, 0},
 						LeadingComments:  &subMessageFieldLeadingComment,
 						TrailingComments: nil,
@@ -46,7 +50,7 @@ func TestParseCommentsWithoutComments(t *testing.T) {
 		&descriptor.FileDescriptorProto{
 			SourceCodeInfo: &descriptor.SourceCodeInfo{
 				Location: []*descriptor.SourceCodeInfo_Location{
-					&descriptor.SourceCodeInfo_Location{
+					{
 						Path: []int32{4, 0},
 					},
 				},
@@ -67,7 +71,7 @@ func TestCommentsGet(t *testing.T) {
 		&descriptor.FileDescriptorProto{
 			SourceCodeInfo: &descriptor.SourceCodeInfo{
 				Location: []*descriptor.SourceCodeInfo_Location{
-					&descriptor.SourceCodeInfo_Location{
+					{
 						Path:            []int32{4, 0},
 						LeadingComments: &comment,
 					},
