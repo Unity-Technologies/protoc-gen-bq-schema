@@ -1,8 +1,4 @@
-<<<<<<<< HEAD:pkg/comments.go
 package pkg
-========
-package converter
->>>>>>>> 34288dc182e30d74eeeee6c15cc1e11f537eae1b:pkg/converter/comments.go
 
 import (
 	"strconv"

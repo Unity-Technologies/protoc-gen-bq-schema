@@ -1,6 +1,7 @@
 /bin
 .idea/
 .DS_Store
+.logs
 
 # Ignore binary that it builds
 protoc-gen-bq-schema
